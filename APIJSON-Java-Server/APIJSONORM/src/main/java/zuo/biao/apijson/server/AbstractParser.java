@@ -18,7 +18,9 @@ import static zuo.biao.apijson.JSONObject.KEY_EXPLAIN;
 import static zuo.biao.apijson.RequestMethod.GET;
 
 import java.io.UnsupportedEncodingException;
+import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Savepoint;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -115,6 +117,29 @@ public abstract class AbstractParser<T> implements Parser<T>, SQLCreator {
 	@Override
 	public AbstractParser<T> setMethod(RequestMethod method) {
 		this.requestMethod = method == null ? GET : method;
+		this.transactionIsolation = RequestMethod.isQueryMethod(method) ? Connection.TRANSACTION_NONE : Connection.TRANSACTION_REPEATABLE_READ;
+		return this;
+	}
+	
+	protected int version;
+	@Override
+	public int getVersion() {
+		return version;
+	}
+	@Override
+	public AbstractParser<T> setVersion(int version) {
+		this.version = version;
+		return this;
+	}
+	
+	protected String tag;
+	@Override
+	public String getTag() {
+		return tag;
+	}
+	@Override
+	public AbstractParser<T> setTag(String tag) {
+		this.tag = tag;
 		return this;
 	}
 
@@ -344,12 +369,18 @@ public abstract class AbstractParser<T> implements Parser<T>, SQLCreator {
 
 		Exception error = null;
 		sqlExecutor = createSQLExecutor();
+		onBegin();
 		try {
 			queryDepth = 0;
 			requestObject = onObjectParse(request, null, null, null, false);
-		} catch (Exception e) {
+
+			onCommit();
+		}
+		catch (Exception e) {
 			e.printStackTrace();
 			error = e;
+
+			onRollback();
 		}
 
 		requestObject = error == null ? extendSuccessResult(requestObject) : extendErrorResult(requestObject, error);
@@ -359,16 +390,13 @@ public abstract class AbstractParser<T> implements Parser<T>, SQLCreator {
 		long endTime = System.currentTimeMillis();
 		long duration = endTime - startTime;
 
-		if (Log.DEBUG) {
-			requestObject.put("sql:generate/cache/execute/maxExecute", sqlExecutor.getGeneratedSQLCount() + "/" + sqlExecutor.getCachedSQLCount() + "/" + sqlExecutor.getExecutedSQLCount() + "/" + getMaxSQLCount());
-			requestObject.put("depth:count/max", queryDepth + "/" + getMaxQueryDepth());
-			requestObject.put("time:start/duration/end", startTime + "/" + duration + "/" + endTime);
+		if (Log.DEBUG) { //用 | 替代 /，避免 APIJSON ORM，APIAuto 等解析路径错误
+			requestObject.put("sql:generate|cache|execute|maxExecute", sqlExecutor.getGeneratedSQLCount() + "|" + sqlExecutor.getCachedSQLCount() + "|" + sqlExecutor.getExecutedSQLCount() + "|" + getMaxSQLCount());
+			requestObject.put("depth:count|max", queryDepth + "|" + getMaxQueryDepth());
+			requestObject.put("time:start|duration|end", startTime + "|" + duration + "|" + endTime);
 		}
 
-		sqlExecutor.close();
-		sqlExecutor = null;
-		queryResultMap.clear();
-		queryResultMap = null;
+		onClose();
 
 		//会不会导致原来的session = null？		session = null;
 
@@ -563,8 +591,10 @@ public abstract class AbstractParser<T> implements Parser<T>, SQLCreator {
 
 		String tag = requestObject.getString(JSONRequest.KEY_TAG);
 		if (StringUtil.isNotEmpty(tag, true) == false) {
-			throw new IllegalArgumentException("请在最外层设置tag！一般是Table名，例如 \"tag\": \"User\" ");
+			throw new IllegalArgumentException("请在最外层设置 tag ！一般是 Table 名，例如 \"tag\": \"User\" ");
 		}
+		setTag(tag);
+
 		int version = requestObject.getIntValue(JSONRequest.KEY_VERSION);
 
 		JSONObject object = null;
@@ -575,7 +605,7 @@ public abstract class AbstractParser<T> implements Parser<T>, SQLCreator {
 			error = e.getMessage();
 		}
 		if (object == null) {//empty表示随意操作  || object.isEmpty()) {
-			throw new UnsupportedOperationException("非开放请求必须是Request表中校验规则允许的操作！\n " + error);
+			throw new UnsupportedOperationException("非开放请求必须是后端 Request 表中校验规则允许的操作！\n " + error);
 		}
 
 		JSONObject target = null;
@@ -647,15 +677,13 @@ public abstract class AbstractParser<T> implements Parser<T>, SQLCreator {
 		config.setOrder(JSONRequest.KEY_VERSION + (version > 0 ? "+" : "-"));
 		config.setCount(1);
 
-		SQLExecutor executor = createSQLExecutor();
+		if (sqlExecutor == null) {
+			sqlExecutor = createSQLExecutor();
+		}
 
 		//too many connections error: 不try-catch，可以让客户端看到是服务器内部异常
-		try {
-			JSONObject result = executor.execute(config, false);
-			return getJSONObject(result, "structure");//解决返回值套了一层 "structure":{}
-		} finally {
-			executor.close();
-		}
+		JSONObject result = sqlExecutor.execute(config, false);
+		return getJSONObject(result, "structure");//解决返回值套了一层 "structure":{}
 	}
 
 
@@ -759,7 +787,7 @@ public abstract class AbstractParser<T> implements Parser<T>, SQLCreator {
 		}
 
 		//不能允许GETS，否则会被通过"[]":{"@role":"ADMIN"},"Table":{},"tag":"Table"绕过权限并能批量查询
-		if (RequestMethod.isGetMethod(requestMethod, false) == false) {
+		if (isSubquery == false && RequestMethod.isGetMethod(requestMethod, false) == false) {
 			throw new UnsupportedOperationException("key[]:{}只支持GET方法！不允许传 " + name + ":{} ！");
 		}
 		if (request == null || request.isEmpty()) {//jsonKey-jsonValue条件
@@ -827,7 +855,7 @@ public abstract class AbstractParser<T> implements Parser<T>, SQLCreator {
 
 
 		//key[]:{Table:{}}中key equals Table时 提取Table
-		int index = name == null ? -1 : name.lastIndexOf("[]");
+		int index = isSubquery || name == null ? -1 : name.lastIndexOf("[]");
 		String childPath = index <= 0 ? null : Pair.parseEntry(name.substring(0, index), true).getKey(); // Table-key1-key2...
 
 		//判断第一个key，即Table是否存在，如果存在就提取
@@ -849,7 +877,7 @@ public abstract class AbstractParser<T> implements Parser<T>, SQLCreator {
 		JSONObject parent;
 		//生成size个
 		for (int i = 0; i < (isSubquery ? 1 : size); i++) {
-			parent = onObjectParse(request, path, "" + i, config.setType(SQLConfig.TYPE_ITEM).setPosition(i), isSubquery);
+			parent = onObjectParse(request, isSubquery ? parentPath : path, isSubquery ? name : "" + i, config.setType(SQLConfig.TYPE_ITEM).setPosition(i), isSubquery);
 			if (parent == null || parent.isEmpty()) {
 				break;
 			}
@@ -1367,7 +1395,7 @@ public abstract class AbstractParser<T> implements Parser<T>, SQLCreator {
 			throw e;
 		}
 		finally {
-			if (config.getPosition() == 0) {
+			if (config.getPosition() == 0 && config.limitSQLCount()) {
 				int maxSQLCount = getMaxSQLCount();
 				int sqlCount = sqlExecutor.getExecutedSQLCount();
 				Log.d(TAG, "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< \n\n\n 已执行 " + sqlCount + "/" + maxSQLCount + " 条 SQL \n\n\n >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
@@ -1379,5 +1407,100 @@ public abstract class AbstractParser<T> implements Parser<T>, SQLCreator {
 	}
 
 
+	//事务处理 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+	private int transactionIsolation = Connection.TRANSACTION_NONE;
+	@Override
+	public int getTransactionIsolation() {
+		return transactionIsolation;
+	}
+	@Override
+	public void setTransactionIsolation(int transactionIsolation) {
+		this.transactionIsolation = transactionIsolation;
+	}
+
+	@Override
+	public void begin(int transactionIsolation) {
+		Log.d("\n\n" + TAG, "<<<<<<<<<<<<<<<<<<<<<<< begin transactionIsolation = " + transactionIsolation + " >>>>>>>>>>>>>>>>>>>>>>> \n\n");
+		sqlExecutor.setTransactionIsolation(transactionIsolation); //不知道 connection 什么时候创建，不能在这里准确控制，sqlExecutor.begin(transactionIsolation);
+	}
+	@Override
+	public void rollback() throws SQLException {
+		Log.d("\n\n" + TAG, "<<<<<<<<<<<<<<<<<<<<<<< rollback >>>>>>>>>>>>>>>>>>>>>>> \n\n");
+		sqlExecutor.rollback();
+	}
+	@Override
+	public void rollback(Savepoint savepoint) throws SQLException {
+		Log.d("\n\n" + TAG, "<<<<<<<<<<<<<<<<<<<<<<< rollback savepoint " + (savepoint == null ? "" : "!") + "= null >>>>>>>>>>>>>>>>>>>>>>> \n\n");
+		sqlExecutor.rollback(savepoint);
+	}
+	@Override
+	public void commit() throws SQLException {
+		Log.d("\n\n" + TAG, "<<<<<<<<<<<<<<<<<<<<<<< commit >>>>>>>>>>>>>>>>>>>>>>> \n\n");
+		sqlExecutor.commit();
+	}
+	@Override
+	public void close() {
+		Log.d("\n\n" + TAG, "<<<<<<<<<<<<<<<<<<<<<<< close >>>>>>>>>>>>>>>>>>>>>>> \n\n");
+		sqlExecutor.close();
+	}
+
+	/**开始事务
+	 */
+	protected void onBegin() {
+		//		Log.d(TAG, "onBegin >>");
+		if (RequestMethod.isQueryMethod(requestMethod)) {
+			return;
+		}
+
+		begin(getTransactionIsolation());
+	}
+	/**提交事务
+	 */
+	protected void onCommit() {
+		//		Log.d(TAG, "onCommit >>");
+		if (RequestMethod.isQueryMethod(requestMethod)) {
+			return;
+		}
+
+		try {
+			commit();
+		}
+		catch (SQLException e) {
+			e.printStackTrace();
+		}
+	}
+	/**回滚事务
+	 */
+	protected void onRollback() {
+		//		Log.d(TAG, "onRollback >>");
+		if (RequestMethod.isQueryMethod(requestMethod)) {
+			return;
+		}
+
+		try {
+			rollback();
+		}
+		catch (SQLException e1) {
+			e1.printStackTrace();
+			try {
+				rollback(null);
+			}
+			catch (SQLException e2) {
+				e2.printStackTrace();
+			}
+		}
+	}
+
+	//事务处理 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+
+	protected void onClose() {
+		//		Log.d(TAG, "onClose >>");
+
+		close();
+		sqlExecutor = null;
+		queryResultMap.clear();
+		queryResultMap = null;
+	}
 
 }

@@ -14,6 +14,9 @@ limitations under the License.*/
 
 package apijson.demo.server;
 
+import java.util.Map;
+import java.util.Set;
+
 import javax.servlet.http.HttpSession;
 
 import com.alibaba.fastjson.JSONObject;
@@ -67,8 +70,22 @@ public class DemoParser extends AbstractParser<Long> {
 	@Override
 	public JSONObject parseResponse(JSONObject request) {
 		//补充format
-		if (session != null && request != null && request.get(JSONRequest.KEY_FORMAT) == null) {
-			request.put(JSONRequest.KEY_FORMAT, session.getAttribute(JSONRequest.KEY_FORMAT));
+		if (session != null && request != null) {
+			if (request.get(JSONRequest.KEY_FORMAT) == null) {
+				request.put(JSONRequest.KEY_FORMAT, session.getAttribute(JSONRequest.KEY_FORMAT));
+			}
+			if (request.get(Controller.DEFAULTS) == null) {
+				JSONObject defaults = (JSONObject) session.getAttribute(Controller.DEFAULTS);
+				Set<Map.Entry<String, Object>> set = defaults == null ? null : defaults.entrySet();
+
+				if (set != null) {
+					for (Map.Entry<String, Object> e : set) {
+						if (e != null && request.get(e.getKey()) == null) {
+							request.put(e.getKey(), e.getValue());
+						}
+					}
+				}
+			}
 		}
 		return super.parseResponse(request);
 	}
@@ -77,7 +94,7 @@ public class DemoParser extends AbstractParser<Long> {
 	@Override
 	public Object onFunctionParse(JSONObject json, String fun) throws Exception {
 		if (function == null) {
-			function = new DemoFunction(requestMethod, session);
+			function = new DemoFunction(requestMethod, tag, version, session);
 		}
 		return function.invoke(fun, json);
 	}
@@ -89,15 +106,7 @@ public class DemoParser extends AbstractParser<Long> {
 		return new DemoObjectParser(session, request, parentPath, name, arrayConfig, isSubquery) {
 
 			//TODO 删除，onPUTArrayParse改用MySQL函数JSON_ADD, JSON_REMOVE等
-			@Override
-			public JSONObject parseResponse(JSONRequest request) throws Exception {
-				DemoParser demoParser = new DemoParser(RequestMethod.GET);
-				demoParser.setSession(session);
-				//						parser.setNoVerifyRequest(noVerifyRequest)
-				demoParser.setNoVerifyLogin(noVerifyLogin);
-				demoParser.setNoVerifyRole(noVerifyRole);
-				return demoParser.parseResponse(request);
-			}
+		
 
 
 			//			@Override

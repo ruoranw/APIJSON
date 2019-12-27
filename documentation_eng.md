@@ -75,7 +75,7 @@ DELETE: <br > 删除数据 | base_url/delete/ | {<br > &nbsp;&nbsp; TableName:{<
 <br >
 
 ### 2. Keyswords in URL parameters
- 
+
  Functions | Key-value pairs | Examples
 ------------ | ------------ | ------------
  Get data in arrays | `"key[]":{}`<br > The part after the colon is a JSONObject. *key* is optional. When *key* is the same as the table name , the JSONObject will be in a simplified form. For example,  `{Table:{Content}}` will be written as `{Content}`.| [{"User[]":{"User":{}}}](http://apijson.cn:8080/get/{"User[]":{"count":3,"User":{}}}) is used for getting data from a user. Here, key and tablename are all “User”,then `{"User":{"id", ...}}` will be written as` {"id", ...}`

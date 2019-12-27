@@ -14,6 +14,9 @@ limitations under the License.*/
 
 package zuo.biao.apijson.server;
 
+import java.sql.SQLException;
+import java.sql.Savepoint;
+
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 
@@ -43,6 +46,12 @@ public interface Parser<T> {
 	@NotNull
 	RequestMethod getMethod();
 	Parser<T> setMethod(@NotNull RequestMethod method);
+
+	int getVersion();
+	Parser<T> setVersion(int version);
+	
+	String getTag();
+	Parser<T> setTag(String tag);
 
 	JSONObject getRequest();
 	Parser<T> setRequest(JSONObject request);
@@ -135,4 +144,13 @@ public interface Parser<T> {
 	Boolean getGlobleExplain();
 	String getGlobleCache();
 
+	
+	int getTransactionIsolation();
+	void setTransactionIsolation(int transactionIsolation);
+	
+	void begin(int transactionIsolation);
+	void rollback() throws SQLException;
+	void rollback(Savepoint savepoint) throws SQLException;
+	void commit() throws SQLException;
+	void close();
 }

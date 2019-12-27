@@ -46,11 +46,14 @@ import zuo.biao.apijson.server.exception.NotLoggedInException;
 import zuo.biao.apijson.server.model.Access;
 import zuo.biao.apijson.server.model.Column;
 import zuo.biao.apijson.server.model.Document;
+import zuo.biao.apijson.server.model.ExtendedProperty;
 import zuo.biao.apijson.server.model.Function;
 import zuo.biao.apijson.server.model.PgAttribute;
 import zuo.biao.apijson.server.model.PgClass;
 import zuo.biao.apijson.server.model.Request;
 import zuo.biao.apijson.server.model.Response;
+import zuo.biao.apijson.server.model.SysColumn;
+import zuo.biao.apijson.server.model.SysTable;
 import zuo.biao.apijson.server.model.Table;
 import zuo.biao.apijson.server.model.Test;
 import zuo.biao.apijson.server.model.TestRecord;
@@ -65,24 +68,32 @@ public abstract class AbstractVerifier<T> implements Verifier<T> {
 
 	// <TableName, <METHOD, allowRoles>>
 	// <User, <GET, [OWNER, ADMIN]>>
+	public static final Map<String, Map<RequestMethod, RequestRole[]>> SYSTEM_ACCESS_MAP;
 	public static final Map<String, Map<RequestMethod, RequestRole[]>> ACCESS_MAP;
+	;
 	static {
-		ACCESS_MAP = new HashMap<String, Map<RequestMethod, RequestRole[]>>();
+		SYSTEM_ACCESS_MAP = new HashMap<String, Map<RequestMethod, RequestRole[]>>();
+
+		SYSTEM_ACCESS_MAP.put(Function.class.getSimpleName(), getAccessMap(Function.class.getAnnotation(MethodAccess.class)));
+		SYSTEM_ACCESS_MAP.put(Request.class.getSimpleName(), getAccessMap(Request.class.getAnnotation(MethodAccess.class)));
+		SYSTEM_ACCESS_MAP.put(Response.class.getSimpleName(), getAccessMap(Response.class.getAnnotation(MethodAccess.class)));
+		SYSTEM_ACCESS_MAP.put(Test.class.getSimpleName(), getAccessMap(Test.class.getAnnotation(MethodAccess.class)));
+		SYSTEM_ACCESS_MAP.put(Access.class.getSimpleName(), getAccessMap(Access.class.getAnnotation(MethodAccess.class)));
 
 		if (Log.DEBUG) {
-			ACCESS_MAP.put(Table.class.getSimpleName(), getAccessMap(Table.class.getAnnotation(MethodAccess.class)));
-			ACCESS_MAP.put(Column.class.getSimpleName(), getAccessMap(Column.class.getAnnotation(MethodAccess.class)));
-			ACCESS_MAP.put(PgAttribute.class.getSimpleName(), getAccessMap(PgAttribute.class.getAnnotation(MethodAccess.class)));
-			ACCESS_MAP.put(PgClass.class.getSimpleName(), getAccessMap(PgClass.class.getAnnotation(MethodAccess.class)));
-			
-			ACCESS_MAP.put(Test.class.getSimpleName(), getAccessMap(Test.class.getAnnotation(MethodAccess.class)));
-			ACCESS_MAP.put(Request.class.getSimpleName(), getAccessMap(Request.class.getAnnotation(MethodAccess.class)));
-			ACCESS_MAP.put(Response.class.getSimpleName(), getAccessMap(Response.class.getAnnotation(MethodAccess.class)));
-			ACCESS_MAP.put(Document.class.getSimpleName(), getAccessMap(Document.class.getAnnotation(MethodAccess.class)));
-			ACCESS_MAP.put(TestRecord.class.getSimpleName(), getAccessMap(TestRecord.class.getAnnotation(MethodAccess.class)));
-			ACCESS_MAP.put(Function.class.getSimpleName(), getAccessMap(Function.class.getAnnotation(MethodAccess.class)));
-			ACCESS_MAP.put(Access.class.getSimpleName(), getAccessMap(Access.class.getAnnotation(MethodAccess.class)));
+			SYSTEM_ACCESS_MAP.put(Table.class.getSimpleName(), getAccessMap(Table.class.getAnnotation(MethodAccess.class)));
+			SYSTEM_ACCESS_MAP.put(Column.class.getSimpleName(), getAccessMap(Column.class.getAnnotation(MethodAccess.class)));
+			SYSTEM_ACCESS_MAP.put(PgAttribute.class.getSimpleName(), getAccessMap(PgAttribute.class.getAnnotation(MethodAccess.class)));
+			SYSTEM_ACCESS_MAP.put(PgClass.class.getSimpleName(), getAccessMap(PgClass.class.getAnnotation(MethodAccess.class)));
+			SYSTEM_ACCESS_MAP.put(SysTable.class.getSimpleName(), getAccessMap(SysTable.class.getAnnotation(MethodAccess.class)));
+			SYSTEM_ACCESS_MAP.put(SysColumn.class.getSimpleName(), getAccessMap(SysColumn.class.getAnnotation(MethodAccess.class)));
+			SYSTEM_ACCESS_MAP.put(ExtendedProperty.class.getSimpleName(), getAccessMap(ExtendedProperty.class.getAnnotation(MethodAccess.class)));
+
+			SYSTEM_ACCESS_MAP.put(Document.class.getSimpleName(), getAccessMap(Document.class.getAnnotation(MethodAccess.class)));
+			SYSTEM_ACCESS_MAP.put(TestRecord.class.getSimpleName(), getAccessMap(TestRecord.class.getAnnotation(MethodAccess.class)));
 		}
+
+		ACCESS_MAP = new HashMap<>(SYSTEM_ACCESS_MAP);
 	}
 
 	/**获取权限Map，每种操作都只允许对应的角色

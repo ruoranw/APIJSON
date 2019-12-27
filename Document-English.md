@@ -1,326 +1,49 @@
+## API Design Rules
 
-<h1 align="center" style="text-align:center;">
-  APIJSON
-</h1>
+### 1. Methods and API endpoints
 
-<p align="center">🏆Gitee Most Valuable Project<br />🚀A JSON Transmission Protocol and an ORM Library for providing APIs and Documents automatically.</p>
+  Methods | URL | Request | Response
+------------ | ------------ | ------------ | ------------
+**GET**: <br /> A general way to get data.<br /> You can use dev tools to make edits in a web browser. | base_url/get/ | {<br /> &nbsp;&nbsp; TableName:{<br /> &nbsp;&nbsp;&nbsp;&nbsp; //Add contiditions here.<br /> &nbsp;&nbsp; }<br />} <br /> <br /> Eg. To get a Moment with `id = 235`：<br />{<br /> &nbsp;&nbsp; "Moment":{<br /> &nbsp;&nbsp;&nbsp;&nbsp; "id":235<br /> &nbsp;&nbsp; }<br />} | {<br /> &nbsp;&nbsp; TableName:{<br /> &nbsp;&nbsp;&nbsp;&nbsp; ...<br /> &nbsp;&nbsp; },<br /> &nbsp;&nbsp; "code":200,<br /> &nbsp;&nbsp; "msg":"success"<br />}<br />Eg.<br />{<br /> &nbsp;&nbsp; "Moment":{<br /> &nbsp;&nbsp;&nbsp;&nbsp; "id":235,<br /> &nbsp;&nbsp;&nbsp;&nbsp; "userId":38710,<br /> &nbsp;&nbsp;&nbsp;&nbsp; "content":"APIJSON,let interfaces and documents go to hell !"<br /> &nbsp;&nbsp; },<br /> &nbsp;&nbsp; "code":200,<br /> &nbsp;&nbsp; "msg":"success"<br /> }
+**HEAD**: <br /> A general way to get counts.<br /> You can use dev tools to make edits in a web browser. | base_url/head/ | {<br /> &nbsp;&nbsp; TableName:{<br /> &nbsp;&nbsp;&nbsp;&nbsp; …<br /> &nbsp;&nbsp; }<br /> } <br /> {…} are conditions. <br /><br /> Eg. Get the number of Moments posted by the user with `id = 38710`：<br />{<br /> &nbsp;&nbsp; "Moment":{<br /> &nbsp;&nbsp;&nbsp;&nbsp; "userId":38710<br /> &nbsp;&nbsp; }<br />} | {<br /> &nbsp;&nbsp; TableName:{<br /> &nbsp;&nbsp;&nbsp;&nbsp; "code":200,<br /> &nbsp;&nbsp;&nbsp;&nbsp; "msg":"success",<br /> &nbsp;&nbsp;&nbsp;&nbsp; "count":10<br /> &nbsp;&nbsp; },<br /> &nbsp;&nbsp; "code":200,<br /> &nbsp;&nbsp; "msg":"success"<br />} <br /> Eg.<br />{<br /> &nbsp;&nbsp; "Moment":{<br /> &nbsp;&nbsp;&nbsp;&nbsp; "code":200,<br /> &nbsp;&nbsp;&nbsp;&nbsp; "msg":"success",<br /> &nbsp;&nbsp;&nbsp;&nbsp; "count":10<br /> &nbsp;&nbsp; },<br /> &nbsp;&nbsp; "code":200,<br /> &nbsp;&nbsp;  "msg":"success"<br />}
+**GETS**: <br /> Get data with high security and confidentiality.<br /> Eg. bank accounts, birth date. | base_url/gets/ | You need to add `"tag":tag` with the same level of `Moment:{}`. Others are the same as **GET**. | Same as **GET**.
+**HEADS**: <br /> Get counts of confidential data(eg. bank account).| base_url/heads/ | You need to add  `"tag":tag` with the same level of `Moment:{}`. Others are the same as **HEAD**. | Same as **HEAD**.
+**POST**: <br /> Add new data. | base_url/post/ | {<br /> &nbsp;&nbsp; TableName:{<br /> &nbsp;&nbsp;&nbsp;&nbsp; …<br /> &nbsp;&nbsp; },<br /> &nbsp;&nbsp; "tag":tag<br />} <br /> The id in {...} is generated automatically when table is built and can’t be set by the user. <br /><br />Eg. A user with `id = 38710` posts a new Moment：<br />{<br /> &nbsp;&nbsp; "Moment":{<br /> &nbsp;&nbsp;&nbsp;&nbsp; "userId":38710,<br /> &nbsp;&nbsp;&nbsp;&nbsp; "content":"APIJSON,let interfaces and documents go to hell !"<br /> &nbsp;&nbsp; },<br /> &nbsp;&nbsp; "tag":"Moment"<br />} | {<br /> &nbsp;&nbsp; TableName:{<br /> &nbsp;&nbsp;&nbsp;&nbsp; "code":200,<br /> &nbsp;&nbsp;&nbsp;&nbsp; "msg":"success",<br /> &nbsp;&nbsp;&nbsp;&nbsp; "id":38710<br /> &nbsp;&nbsp; },<br /> &nbsp;&nbsp; "code":200,<br /> &nbsp;&nbsp; "msg":"success"<br />}<br />Eg.<br />{<br /> &nbsp;&nbsp; "Moment":{<br /> &nbsp;&nbsp;&nbsp;&nbsp; "code":200,<br /> &nbsp;&nbsp;&nbsp;&nbsp; "msg":"success",<br /> &nbsp;&nbsp;&nbsp;&nbsp; "id":120<br /> &nbsp;&nbsp; },<br /> &nbsp;&nbsp; "code":200,<br /> &nbsp;&nbsp; "msg":"success"<br />}
+**PUT**: <br /> Make changes to a specific item.<br /> Only change the part sent to server. | base_url/put/ | {<br /> &nbsp;&nbsp; TableName:{<br /> &nbsp;&nbsp;&nbsp;&nbsp; "id":id,<br /> &nbsp;&nbsp;&nbsp;&nbsp; …<br /> &nbsp;&nbsp; },<br /> &nbsp;&nbsp; "tag":tag<br />} <br />  You can also add multiple id as `id{}`.<br /><br />Eg. Make changes to Moment's content with id= 235:<br />{<br /> &nbsp;&nbsp; "Moment":{<br /> &nbsp;&nbsp;&nbsp;&nbsp; "id":235,<br /> &nbsp;&nbsp;&nbsp;&nbsp; "content":"APIJSON,let interfaces and documents go to hell !"<br /> &nbsp;&nbsp; },<br /> &nbsp;&nbsp; "tag":"Moment"<br />} | Same as **POST**.
+**DELETE**: <br /> Delete data. | base_url/delete/ | {<br /> &nbsp;&nbsp; TableName:{<br /> &nbsp;&nbsp;&nbsp;&nbsp; "id":id<br /> &nbsp;&nbsp; },<br /> &nbsp;&nbsp; "tag":tag<br />} <br /> You can also add multiple id as `id{}`. <br /><br /> Or Delete contents with multiple id：<br />{<br /> &nbsp;&nbsp; "Comment":{<br /> &nbsp;&nbsp;&nbsp;&nbsp; "id{}":[100,110,120]<br /> &nbsp;&nbsp; },<br /> &nbsp;&nbsp; "tag":"Comment[]"<br />} | {<br /> &nbsp;&nbsp; TableName:{<br /> &nbsp;&nbsp;&nbsp;&nbsp; "code":200,<br /> &nbsp;&nbsp;&nbsp;&nbsp; "msg":"success",<br /> &nbsp;&nbsp;&nbsp;&nbsp; "id[]":[100,110,120]<br />&nbsp;&nbsp; &nbsp;&nbsp; "count":3<br /> &nbsp;&nbsp; },<br /> &nbsp;&nbsp; "code":200,<br /> &nbsp;&nbsp; "msg":"success"<br />}<br />Eg.<br />{<br />&nbsp;&nbsp; "Comment":{<br />&nbsp;&nbsp; &nbsp;&nbsp; "code":200,<br />&nbsp;&nbsp; &nbsp;&nbsp; "msg":"success",<br />&nbsp;&nbsp; &nbsp;&nbsp; "id[]":[100,110,120],<br />&nbsp;&nbsp; &nbsp;&nbsp; "count":3<br />&nbsp;&nbsp; },<br />&nbsp;&nbsp; "code":200,<br />&nbsp;&nbsp; "msg":"success"<br />}
 
-
-<p align="center" >
-  <a href="https://github.com/TommyLemon/APIJSON/tree/master/MySQL"><img src="https://img.shields.io/badge/MySQL-5.7%2B-brightgreen.svg?style=flat"></a>
-  <a href="https://github.com/TommyLemon/APIJSON/tree/master/PostgreSQL"><img src="https://img.shields.io/badge/PostgreSQL-9.5%2B-brightgreen.svg?style=flat"></a>
-  <a href="https://github.com/TommyLemon/APIJSON/tree/master/Oracle"><img src="https://img.shields.io/badge/Oracle-11%2B-brightgreen.svg?style=flat"></a>
-  <a href="https://github.com/TommyLemon/APIJSON/tree/master/MySQL"><img src="https://img.shields.io/badge/TiDB-2.1%2B-brightgreen.svg?style=flat"></a>
-</p>
-<p align="center" >
-  <a href="https://github.com/TommyLemon/APIJSON/tree/master/APIJSON-Java-Server"><img src="https://img.shields.io/badge/Java-1.7%2B-brightgreen.svg?style=flat"></a>
-  <a href="https://github.com/liaozb/APIJSON.NET"><img src="https://img.shields.io/badge/CSharp-2.1%2B-brightgreen.svg?style=flat"></a>
-  <a href="https://github.com/orchie/apijson"><img src="https://img.shields.io/badge/PHP-7.0%2B-brightgreen.svg?style=flat"></a>
-  <a href="https://github.com/TEsTsLA/apijson"><img src="https://img.shields.io/badge/Node.js-ES6%2B-brightgreen.svg?style=flat"></a>
-  <a href="https://github.com/zhangchunlin/uliweb-apijson"><img src="https://img.shields.io/badge/Python-3%2B-brightgreen.svg?style=flat"></a>
-</p>
-<p align="center" >
-  <a href="https://github.com/TommyLemon/APIJSON/tree/master/APIJSON-Android"><img src="https://img.shields.io/badge/Android-4.0%2B-brightgreen.svg?style=flat"></a>
-  <a href="https://github.com/TommyLemon/APIJSON/tree/master/APIJSON-iOS"><img src="https://img.shields.io/badge/iOS-7%2B-brightgreen.svg?style=flat"></a>
-  <a href="https://github.com/TommyLemon/APIJSON/tree/master/APIJSON-JavaScript"><img src="https://img.shields.io/badge/JavaScript-ES6%2B-brightgreen.svg?style=flat"></a>
-</p>
-<p align="center" >
-  <a href="http://apijson.org/">Chinese&nbsp;             </a>
-  <a href="http://i.youku.com/apijson">Video&nbsp;             </a>
-  <a href="http://apijson.cn/">Test</a>
-</p>
-
-<p align="center" >
-  <img src="https://raw.githubusercontent.com/TommyLemon/APIJSON/master/logo.png" />
-</p>
+**Note**:<br />
+1. TableName means the name of the table where you get data. It’ll respond with a JSON Object(the form is {....})with columns inside.
+2. `"tag":tag` is needed when methods are not GET or HEAD. The tag after the colon is the key in JSON Object of making requests. Generally, it’s the name of the table you’re looking for.
+3. GET, HEAD are methods for general data requests.They support versatile JSON Object structure. Other methods are used for requesting confidential data and the requesting JSON Object needs to be in the same form/order as that in the database. Otherwise, the request shall be denied.
+4. GETS and GET, HEADS and HEAD return the same type of data. But the request form is a little different.
+5. For HTTP, all API methods (get,gets,head,heads,post,put,delete) make requests with HTTP POST.
+6. All JSON Objects here are with {...} form. You can put items or objects in it.
+7. Each object in the database has a unique address.
 
 <br />
 
-* ### [1. About](#1)
-* ### [2. Server-side deployment](#2)
-* [2.1 Installing with Eclipse](#2.1)
-* [2.2 Import MySQL table files](#2.2)
-* [2.3 Installing with IntellIJ IDEA Ultimate](#2.3)
-* ### [3. Client-side deployment](#3)
-* [3.1 For Android](#3.1)
-* [3.2 For iOS](#3.2)
-* [3.3 For Javascript](#3.3)
-* ### [4.Contributing](#4)
-* ### [5.Versioning](#5)
-* ### [6.Author](#6)
-* ### [7.Donating](#7)
+### 2. Keyswords in URL parameters
+ 
+ Functions | Key-value pairs | Examples
+------------ | ------------ | ------------
+ Get data in arrays | `"key[]":{}`<br /> The part after the colon is a JSONObject. *key* is optional. When *key* is the same as the table name , the JSONObject will be in a simplified form. For example,  `{Table:{Content}}` will be written as `{Content}`.| [{"User[]":{"User":{}}}](http://apijson.cn:8080/get/{"User[]":{"count":3,"User":{}}}) <br />It is used for getting data from a user. Here, key and tablename are all "User", then <br />`{"User":{"id", ...}}` <br />will be written as <br /> `{"id", ...}`
+ Get data that meets specific conditions | `"key{}":[]` <br />The part after the colon is a JSONArray with conditions inside.| ["id{}":[38710,82001,70793]](http://apijson.cn:8080/get/{"User[]":{"count":3,"User":{"id{}":[38710,82001,70793]}}}) <br />In SQL, this would be `id IN(38710,82001,70793)`. <br />It means getting data with id equals 38710,82001,70793.
+ Get data with comparison operation| `"key{}":"condition0,condition1..."`<br />Conditions can be any SQL comparision operation. Use''to include any non-number characters.| ["id{}":"<=80000,\>90000"](http://apijson.cn:8080/get/{"User[]":{"count":3,"User":{"id{}":"<=80000,\>90000"}}}) <br />In SQL, it'd be <br /> `id<=80000 OR id>90000`, <br />which means get User array with id\<=80000 \| id>90000
+ Get data that contains an element | `"key<>":Object`  =>  `"key<>":[Object]` <br /> *key* must be a JSONArray while *Object* cannot be JSON.|  ["contactIdList<\>":38710](http://apijson.cn:8080/get/{"User[]":{"count":3,"User":{"contactIdList<\>":38710}}}) <br />In SQL, this would be <br />`json_contains(contactIdList,38710)`. <br />It means find data of the User whose contactList contains 38710.
+ See if it exists |`"key}{@":{`<br /> &nbsp;&nbsp; `"from":"Table",`<br /> &nbsp;&nbsp; `"Table":{ ... }`<br />`}`<br /><br />}{ means EXISTS.<br /> *key* is the one you want to check. <br />Here is a *Subquery* in it, see specifications below for more information. | ["id}{@":{<br /> &nbsp;&nbsp; "from":"Comment",<br /> &nbsp;&nbsp; "Comment":{<br /> &nbsp;&nbsp;  &nbsp;&nbsp; "momentId":15 <br /> &nbsp;&nbsp; }<br />}](http://apijson.cn:8080/get/{"User":{"id}{@":{"from":"Comment","Comment":{"momentId":15}}}})<br /> WHERE EXISTS(SELECT * FROM Comment WHERE momentId=15)
+ Include functions in parameters | `"key()":"function (key0,key1...)"`<br />This will trigger the back-end <br /> `function(JSONObject request, String key0, String key1...)` <br />to get or testify data.<br /> Use - and + to show the order of priority: analyze key-() > analyze the current object > analyze key() > analyze child object > analyze key+()| ["isPraised()":"isContain(praiseUserIdList,userId)"](http://apijson.cn:8080/get/{"Moment":{"id":301,"isPraised()":"isContain(praiseUserIdList,userId)"}}) <br />This will use function boolean isContain(JSONObject request, String array, String value). In this case, client will get "isPraised":true(In this case, client use function to testify if a user clicked ‘like’ button for a Moment.)
+ Refer a value | `"key@":"key0/key1/.../refKey"`<br />Use / to show path. The part before the colon is the key that wants to refer. The path after the colon starts with the parent level of the key.| ["Moment":{<br /> &nbsp;&nbsp; "userId":38710<br />},<br />"User":{<br /> &nbsp;&nbsp; "id@":"/Moment/userId"<br />}](http://apijson.cn:8080/get/{"Moment":{"userId":38710},"User":{"id@":"%252FMoment%252FuserId"}})<br /> In this example, the value of id in User refer to the *userId* in *Moment*, which means <br />`User.id = Moment.userId`. <br />After the request is sent, <br />`"id@":"/Moment/userId"` will be `"id":38710`.
+ Subquery | `"key@":{`<br /> &nbsp;&nbsp; `"range":"ALL",` <br /> &nbsp;&nbsp; `"from":"Table",`<br /> &nbsp;&nbsp; `"Table":{ ... }`<br />`}`<br />*range* can be ALL, ANY.<br />*from* means which table you want to query. <br />It’s very similar to how you query in SQL. <br />You can also use *count*, *join*, etc. | ["id@":{<br /> &nbsp;&nbsp; "from":"Comment",<br /> &nbsp;&nbsp; "Comment":{<br /> &nbsp;&nbsp;  &nbsp;&nbsp; "@column":"min(userId)" <br /> &nbsp;&nbsp; }<br />}](http://apijson.cn:8080/get/{"User":{"id@":{"from":"Comment","Comment":{"@column":"min(userId)"}}}})<br /> `WHERE id=(SELECT min(userId) FROM Comment)`.
+ Fuzzy matching | `"key$":"SQL search expressions"`  =>  `"key$":["SQL search expressions"]`<br />Any SQL search expressions.Eg.%key%(include key), key%(start with key),%k%e%y%(include k, e, y). % means any characters. | ["name$":"%m%"](http://apijson.cn:8080/get/{"User[]":{"count":3,"User":{"name$":"%2525m%2525"}}}) <br />In SQL, it's <br />`name LIKE '%m%'`, <br />meaning that get User with ‘m’ in name.
+ Regular Expression| `"key~":"regular expression"`  =>  `"key~":["regular expression"]`<br />It can be any regular expressions.Eg. ^[0-9]+$ ，*~ not case sensitive, advanced search is applicable.| ["name~":"^[0-9]+$"](http://apijson.cn:8080/get/{"User[]":{"count":3,"User":{"name~":"^[0-9]%252B$"}}}) <br />In SQL, it's <br />`name REGEXP '^[0-9]+$'`.
+ Get data in a range| `"key%":"start,end"`  =>  `"key%":["start,end"]`<br />The data type of start and end can only be either Boolean, Number or String. Eg. "2017-01-01,2019-01-01" ，["1,90000", "82001,100000"]. It's used for getting data from a specific time range. | ["date%":"2017-10-01,2018-10-01"](http://apijson.cn:8080/get/{"User[]":{"count":3,"User":{"date%2525":"2017-10-01,2018-10-01"}}}) <br />In SQL, it's <br />`date BETWEEN '2017-10-01' AND '2018-10-01'`, <br />meaning to get User data that registered between 2017-10-01 and 2018-10-01.
+ Make an alias | `"name:alias"`<br />this changes name to alias in returning results. It’s applicable to column, tableName, SQL Functions, etc. but only in GET, HEAD requests. | ["@column":"toId:parentId"](http://apijson.cn:8080/get/{"Comment":{"@column":"id,toId:parentId","id":51}}) <br />In SQL, it's <br />`toId AS parentId`. <br />It'll return `parentId` instead of `toId`.
+ Add / expand an item | `"key+":Object` <br /> The type of Object is decided by *key*. Types can be Number, String, JSONArray. Froms are 82001,"apijson",["url0","url1"] respectively. It’s only applicable to PUT request.| "praiseUserIdList+":[82001]. In SQL, it's <br />`json_insert(praiseUserIdList,82001)`. <br />Add an *id* that praised the Moment.
+ Delete / decrease an item | `"Key-":Object`<br /> It’s the contrary of "key+" | "balance-":100.00. In SQL, it's <br />`balance = balance - 100.00`, <br />meaning there's 100 less in balance.
+ Operations | &, \|, ! <br /> They're used in logic operations. It’s the same as AND, OR, NOT in SQL respectively. <br />By default, for the same key, it’s ‘\|’ (OR)operation among conditions; for different keys, the default operation among conditions is ‘&’(AND). <br /> |  ① ["id&{}":">80000,<=90000"](http://apijson.cn:8080/head/{"User":{"id&{}":">80000,<=90000"}}) <br />In SQL, it's <br />`id>80000 AND id<=90000`, <br />meaning *id* needs to be id>80000 & id<=90000<br /><br /> ② ["id\|{}":">90000,<=80000"](http://apijson.cn:8080/head/{"User":{"id\|{}":">90000,<=80000"}}) <br />It's the same as "id{}":">90000,<=80000". <br />In SQL, it's <br />`id>80000 OR id<=90000`, <br />meaning that *id* needs to be id>90000 \| id<=80000<br /><br /> ③ ["id!{}":[82001,38710]](http://apijson.cn:8080/head/{"User":{"id!{}":[82001,38710]}}) <br />In SQL, it's <br />`id NOT IN(82001,38710)`, <br />meaning id needs to be ! (id=82001 \| id=38710).
+ Keywords in an Array: It can be self-defined. | As for `"key":Object`, *key* is the keyword of *{}* in *"[]":{}*. The type of *Object* is up to *key*.<br /><br />① `"count":Integer` It's used to count the number. The default largest number is 100. <br /><br />② `"page":Integer` It’s used for getting data from which page, starting from 0. The default largest number is 100. It’s usually used with COUNT. <br /><br />③ `"query":Integer` Get the number of items that match conditions<br />When to get the object, the integer should be 0; when to get the total number, it’s 1; when both above, it’s 2.<br />You can get the total number with keyword total. It can be referred to other values. <br />Eg. <br />`"total@":"/[]/total"` <br />Put it as the same level of query.  <br />*Query* and *total* are used in GET requests just for convenience. Generally, HEAD request is for getting numbers like the total number.<br /><br />④ `"join":"&/Table0/key0@,</Table1/key1@"`<br />Join tables：<br /> "\<" - LEFT JOIN <br /> ">" - RIGHT JOIN <br /> "&" - INNER JOIN <br /> "\|" - FULL JOIN <br />  "!" - OUTTER JOIN <br /> "@" - APP JOIN <br />Where @ APP JOIN is in application layer.It’ll get all the keys in tables that refKeys in result tables are referred to, like refKeys:[value0, value1….]. Then, as the results get data according to `key=$refKey` a number of times (COUNT), it uses key `IN($refKeys)` to put these counts together in just one SQL query, in order to improve the performance.<br /> Other JOIN functions are the same as those in SQL. <br />`"join":"</ViceTable/key@",`<br />`"MainTable":{},`<br />`"ViceTable":{"key@":"/MainTable/refKey"}`<br />will return <br />`MainTable LEFT JOIN ViceTable` <br />`ON ViceTable.key=MainTable.refKey` <br /><br />⑤ `"otherKey":Object` Self-defined keyword other than those that already in the system. It also returns with self-defined keywords.| ① Get User arrays with maximum of 5：<br />["count":5](http://apijson.cn:8080/get/{"[]":{"count":5,"User":{}}})<br /><br /> ② Look into User arrays on page 3. Show 5 of them each page. <br />["count":5,<br />"page":3](http://apijson.cn:8080/get/{"[]":{"count":5,"page":3,"User":{}}})<br /><br /> ③ Get User Arrays and count the total number of Users：<br />["[]":{<br /> &nbsp;&nbsp; "query":2,<br /> &nbsp;&nbsp; "User":{}<br />},<br />"total@":"/[]/total"](http://apijson.cn:8080/get/{"[]":{"query":2,"count":5,"User":{}},"total@":"%252F[]%252Ftotal"})<br />Questions like total page numbers or if there's next page can be solved by total,count,page functions，<br />Total page number: <br/>`int totalPage = Math.ceil(total / count)`<br />If this is the last page: <br />`boolean hasNextPage = total > count*page`<br />If this is the first page: <br />`boolean isFirstPage = page <= 0`<br />If it's the last page: <br />`boolean isLastPage = total <= count*page`<br />... <br /><br /> ④ Moment INNER JOIN User LEFT JOIN Comment：<br />["[]":{<br /> &nbsp;&nbsp; "join": "&/User/id@,\</Comment/momentId@",<br /> &nbsp;&nbsp; "Moment":{},<br /> &nbsp;&nbsp; "User":{<br /> &nbsp;&nbsp;&nbsp;&nbsp; "name~":"t",<br /> &nbsp;&nbsp;&nbsp;&nbsp; "id@": "/Moment/userId"<br /> &nbsp;&nbsp; },<br /> &nbsp;&nbsp; "Comment":{<br /> &nbsp;&nbsp;&nbsp;&nbsp; "momentId@": "/Moment/id"<br /> &nbsp;&nbsp; }<br />}](http://apijson.cn:8080/get/{"[]":{"count":5,"join":"&%252FUser%252Fid@,\<%252FComment%252FmomentId@","Moment":{"@column":"id,userId,content"},"User":{"name~":"t","id@":"%252FMoment%252FuserId","@column":"id,name,head"},"Comment":{"momentId@":"%252FMoment%252Fid","@column":"id,momentId,content"}}})<br /><br /> ⑤ Add the current user to every level：<br />["User":{},<br />"[]":{<br /> &nbsp;&nbsp; "name@":"User/name", //self-defined keyword<br /> &nbsp;&nbsp; "Moment":{}<br />}](http://apijson.cn:8080/get/{"User":{},"[]":{"name@":"User%252Fname","Moment":{}}})
+ Keywords in Objects: It can be self-defined. | `"@key":Object` @key is the keyword of {} in Table:{}. The type of Object is decided by @key<br /><br />① `"@combine":"&key0,&key1,\|key2,key3,`<br />`!key4,!key5,&key6,key7..."`<br />First, it’ll group data with same operators. Within one group, it operates from left to right. Then it’ll follow the order of & \| ! to do the operation. Different groups are connected with &. So the expression above will be : <br /> (key0 & key1 & key6 & other key) & (key2 \| key3 \| key7) & !(key4 \| key5) <br />\| is optional. <br /><br />② `"@column":"column;function(arg)..."` Return with specific columns.<br /><br />③ `"@order":"column0+,column1-..."` Decide the order of returning results:<br /><br />④ `"@group":"column0,column1..."` How to group data. If @column has declared Table id, this id need to be included in @group. In other situations, at least one of the following needs to be done:<br />1.Group id is declared in @column<br />2.Primary Key of the table is declared in @group.<br/><br/>⑤ `@having":"function0(...)?value0;function1(...)?value1;function2(...)?value2..."` Add conditions on return results with @having. Usually working with@group, it’s declared in @column.<br /><br />⑥ `"@schema":"sys"` Can be set as default setting.<br /><br />⑦ `"@database":"POSTGRESQL"` Get data from a different database.Can be set as default setting.<br /><br />⑧ `"@role":"OWNER"` Get information of the user, including <br />UNKNOWN,LOGIN,CONTACT,CIRCLE,OWNER,ADMIN，<br />Can be set as default setting. <br />You can self-define a new role or rewrite a role.  Use`Verifier.verify` etc. to self-define validation methods. <br /><br />⑨ `"@explain":true` Profiling. Can be set as default setting. <br /><br />⑩ `"@otherKey":Object` Self-define keyword | ① Search *Users* that *name* or *tag* contains the letter "a":<br />["name~":"a",<br />"tag~":"a",<br />"@combine":"name~,tag~"](http://apijson.cn:8080/get/{"User[]":{"count":10,"User":{"@column":"id,name,tag","name~":"a","tag~":"a","@combine":"name~,tag~"}}})<br /><br /> ② Only search column id,sex,name and return with the same order:<br />["@column":"id,sex,name"](http://apijson.cn:8080/get/{"User":{"@column":"id,sex,name","id":38710}})<br /><br /> ③ Search Users that have descending order of name and default order of id:<br />["@order":"name-,id"](http://apijson.cn:8080/get/{"[]":{"count":10,"User":{"@column":"name,id","@order":"name-,id"}}})<br /><br /> ④ Search Moment grouped with userId: <br />["@group":"userId,id"](http://apijson.cn:8080/get/{"[]":{"count":10,"Moment":%7B"@column":"userId,id","@group":"userId,id"}}})<br /><br /> ⑤ Search Moments that id equals or less than 100 and group with userId:<br />["@column":"userId;max(id)",<br />"@group":"userId",<br />"@having":"max(id)>=100"](http://apijson.cn:8080/get/{"[]":{"count":10,"Moment":{"@column":"userId%253Bmax(id)","@group":"userId","@having":"max(id)>=100"}}})<br />You can also define the name of the returned function:<br />["@column":"userId;max(id):maxId",<br />"@group":"userId",<br />"@having":"maxId>=100"](http://apijson.cn:8080/get/{"[]":{"count":10,"Moment":{"@column":"userId%253Bmax(id):maxId","@group":"userId","@having":"maxId>=100"}}})<br /><br /> ⑥ Check Users table in sys: <br />["@schema":"sys"](http://apijson.cn:8080/get/{"User":{"@schema":"sys"}})<br /><br /> ⑦ Check Users table in PostgreSQL:<br />["@database":"POSTGRESQL"](http://apijson.cn:8080/get/{"User":{"@database":"POSTGRESQL"}})<br /><br /> ⑧ Check the current user's activity:<br />["@role":"OWNER"](http://apijson.cn:8080/get/{"[]":{"Moment":{"@role":"OWNER"}}})<br /><br /> ⑨ Turn on profiling: <br />["@explain":true](http://apijson.cn:8080/get/{"[]":{"Moment":{"@explain":true}}})<br /><br /> ⑩ Get the No.0 picture from pictureList：<br />["@position":0, //self-defined keyword<br />"firstPicture()":"getFromArray(pictureList,@position)"](http://apijson.cn:8080/get/{"User":{"id":38710,"@position":0,"firstPicture()":"getFromArray(pictureList,@position)"}})
 
 <br />
 
-## <h2 id= "1">1. About <h2/>
-
-APIJSON is a JSON based internet communication protocol and an ORM library that largely simplifies the process of back-end API development. It also allows users to get data more quickly with self-defined form and fewer endpoints requests.
-
-### Features:
-#### For getting data:
-You can get any data by defining the specific information you want and send it to the server.<br />
-You can get different types of data by making just one request to the server. It's very convenient and flexible, and dosen't require different API endpoints with multiple requests.<br />
-It provides CRUD(read and write), Fuzzy Search, Remote Function Calls，etc. You can also save duplicate data, see request history,etc.<br />
-
-#### For API design:
-APIJSON largely reduces API developers' workload by reducing most api design and documentation work.<br />
-With APIJSON, client developers will no longer be suffered from possible errors in documents, and it saves communication between server developers and client developers about APIs or documentations .<br />
-Server developers no longer need to worry about compatibility of APIs and documents with legacy apps.
-
-### Examples:
-#### Get a User
-Request:
-<pre><code class="language-json">
-{
-  "User":{
-  }
-}
-</code></pre>
-
-[Click here to test](http://apijson.cn:8080/get/{"User":{}})
-
-Response:
-<pre><code class="language-json">
-{
-  "User":{
-    "id":38710,
-    "sex":0,
-    "name":"TommyLemon",
-    "certified":true,
-    "tag":"Android&Java",
-    "phone":13000038710,
-    "head":"http://static.oschina.net/uploads/user/1218/2437072_100.jpg?t=1461076033000",
-    "date":1485948110000,
-    "pictureList":[
-      "http://static.oschina.net/uploads/user/1218/2437072_100.jpg?t=1461076033000",
-      "http://common.cnblogs.com/images/icon_weibo_24.png"
-    ]
-  },
-  "code":200,
-  "msg":"success"
-}
-</code></pre>
-
-<br />
-
-#### Get an Array of Users
-Request:
-<pre><code class="language-json">
-{
-  "[]":{
-    "count":3,             //just get 3 results
-    "User":{
-      "@column":"id,name"  //just get ids and names
-    }
-  }
-}
-</code></pre>
-
-[Click here to test](http://apijson.cn:8080/get/{"[]":{"count":3,"User":{"@column":"id,name"}}})
-
-Response:
-<pre><code class="language-json">
-{
-  "[]":[
-    {
-      "User":{
-        "id":38710,
-        "name":"TommyLemon"
-      }
-    },
-    {
-      "User":{
-        "id":70793,
-        "name":"Strong"
-      }
-    },
-    {
-      "User":{
-        "id":82001,
-        "name":"Android"
-      }
-    }
-  ],
-  "code":200,
-  "msg":"success"
-}
-</code></pre>
-
-<br />
-
-[Test it online](http://apijson.cn/)<br />
-
-![](https://raw.githubusercontent.com/TommyLemon/StaticResources/master/APIJSON_Auto_get.jpg) 
-
-![](https://raw.githubusercontent.com/TommyLemon/StaticResources/master/APIJSON_Auto_code.jpg) 
-<p align="center" >
-
-
-## <h2 id="2">2.Server-side deployment<h2/>
-		
-You can use either Eclipse for JavaEE or IntelllJ IDEA Ultimate to make installation. For both, first download the project and save it to a path.
-
-### <h3 id="2.1">2.1 Installing with Eclipse<h3/>
-
-#### <h4 id="2.1.1">2.1.1 prerequisites<h4/>
-  
-Java Development Kit(JDK): 1.8 or above 
-[MAVEN](https://maven.apache.org/download.cgi): 3.0 or above
-Mysql / Oracle
-[Eclipse Java EE IDE](https://www.eclipse.org/downloads/)for Web Developers.Version: Mars.1 Release (4.5.1) 
-
-#### <h4 id="2.1.2">2.1.2 Opening the project with Eclipse<h4/>
-  
-Open Eclipse> *File > Import > Maven > Existing Maven Projects > Next > Browse > Select the path of the project you saved / APIJSON-Java-Server / APIJSONBoot > check pom.xml...apijson-demo > Finish*
-  
-#### <h4 id="2.1.3">2.1.3 Preparing the library used in demo<h4/>
-  
-In the menu at the right, click libs, right click apijson-orm.jar,click add as library. Apply the same to the rest *.jar* files in libs.
-
-#### <h4 id="2.1.4">2.1.4 Configuration<h4/>
-  
-Open apijson.demo.server.DemoSQLConfig. In line 40-61, change return values of `getDBUri`,`getDBAccount`,`getDBPassword`,`getSchema` to your own database.<br/>
-
-<pre><code class="language-java">
-@Override
-	public String getDBUri() {
-		//TODO: Change the return value to your own
-		return DATABASE_POSTGRESQL.equalsIgnoreCase(getDatabase()) ? "jdbc:postgresql://localhost:5432/postgres" : "jdbc:mysql://192.168.71.146:3306/";
-	}
-	@Override
-	public String getDBAccount() {
-    //TODO: Change the return value to your own
-		return DATABASE_POSTGRESQL.equalsIgnoreCase(getDatabase()) ? "postgres" : "root";
-	}
-	@Override
-	public String getDBPassword() {
-  	//TODO: Change the return value to your own
-		return DATABASE_POSTGRESQL.equalsIgnoreCase(getDatabase()) ? null : "root"; 
-	}
-	@Override
-	public String getSchema() {
-		String s = super.getSchema();
-		return StringUtil.isEmpty(s, true) ? "thea" : s; //TODO: Change the return value to your own. For here,change "thea" to "your database's name"
-	}
-</code></pre>
-
-**Note**: Instead of this step, you can also [import your database](#2.2).
-  
-#### <h4 id="2.1.5">2.1.5 Running the application<h4/>
-
-In Eclipse, in the menu on the top, click *Run>Run As>Java Application>choose APIJSONApplication>OK*
-
-### <h3 id="2.2">2.2 Import MySQL table files<h3/>
-
-This Server project needs [MySQL Server](https://dev.mysql.com/downloads/mysql/) and [MySQLWorkbench](https://www.mysql.com/products/workbench/). Please make sure that both of them are installed.<br />
-
-My config is Windows 7 + MySQL Community Server 5.7.16 + MySQLWorkbench 6.3.7 and OSX EI Capitan + MySQL Community Server 5.7.16 + MySQLWorkbench 6.3.8. Systems and softwares are all 64 bit.
-
-Start *MySQLWorkbench > Enter a connection > Click Server menu > Data Import > Select the path of your .sql file > Start Import > Refresh SCHEMAS*. Now you should see tables are added successfully.
-
-### <h3 id="2.3">2.3 Installing with IntellIJ IDEA Ultimate<h3/>
-  
-#### <h4 id="2.3.1">2.3.1 Opening the project<h4/>
-
-*Open > Select the path of the project/APIJSON-Java-Server/APIJSONBoot > OK*
-
-#### <h4 id="2.3.2">2.3.2 Preparing the library used in demo<h4/>  
-  
-In libs, right-click *apijson-orm.jar >Add as Library>OK*. Apply this to all *.jar* files in libs.
-
-#### <h4 id="2.3.3">2.3.3 Running the application<h4/>
-  
-In the menu on the top: *Run > Run > Edit Configurations > + > Application > Configuration*<br />
-In *Main class* , choose *APIJSONApplication*;<br />
-In *Use classpath of module* , choose *apijson-demo*.<br />
-Click *Run* in the bottom.
-
-**Note**: After running, you should see APIJSON test logs and in the last, it would show ‘APIJSON已启动’. If it shows ‘address already in use’, that means port 8080 has been used . You need tochange the port. See [how to change ports for a Spring Boot Application.](https://stackoverflow.com/questions/21083170/how-to-configure-port-for-a-spring-boot-application)
-
-<br />
-
-## <h2 id="3">3. Client-side deployment<h2/> 
-	
-### <h3 id="3.1">3.1 For Android<h3/>
-	
-Make sure you have either [ADT Bundle](https://stuff.mit.edu/afs/sipb/project/android/docs/sdk/installing/bundle.html) or [Android Studio](https://developer.android.com/studio) installed.<br />
-
-My config:  Windows 7 + JDK 1.7.0_71 + ADT Bundle 20140702 + Android Studio 2.2 and OSX EI Capitan + (JDK 1.7.0_71 + ADT Bundle 20140702) + (JDK 1.8.0_91 + Android Studio 2.1.2). All the systems and software are 64 bit.<br />
-
-* 1.Importing<br />
-*Open an existing Android Studio project > Select the path of APIJSON-Master/APIJSON-Android/APIJSONApp(or APIJSONTest） > OK*
-
-* 2.Running<br />
-*Run > Run app*
-
-* 3.Testing <br />
-In the browser, send a request to the server. It should return with the result.
-If the default url is not available, change it to an available one, such as an IPV4 address that is running the server of the APIJSON project. Then click the request button again.
-
-### <h3 id="3.2">3.2 For iOS<h3/>
-	
-Open xCode, then *APIJSON-Master/APIJSON-iOS/APIJSON-Swift > Open*<br/>
-
-In xCode, *Product > Run* 
-
-### <h3 id="3.3">3.3 For Javascript<h3/>
-
-You can use either an IDE or text editor like sublime, Atom, etc. Webstorm is recommended.<br/>
-While using a text editor, you just open the .html file in the APIJSON-JS folder.<br/>
-You can also open it with Vue javascript framework. Click [here](https://vuejs.org/) to learn more.
-
-## <h2 id="4">4. Contributing<h2/> 
-	
-We are always looking for more developers to help implementing new features, fix bugs, etc. Please have a look at the [open issues](https://github.com/APIJSON/APIJSON/issues) before opening a new one .<br />
-
-Fork the project and send a pull request.<br />
-
-Please also ⭐Star the project!
-<br />
-
-## <h2 id="5">5. Versioning<h2/> 
-	
-See the latest version [here.](https://github.com/TommyLemon/APIJSON/commits/master)
-
-<br />
-
-## <h2 id="6">6. Auhtor<h2/> 	
-	
-Check out the author's [github account](https://github.com/TommyLemon)to see more related projects.<br>
-
-If you have any questions or suggestions, you can [create an issue](https://github.com/TommyLemon/APIJSON/issues) or [send me an e-mail](mailto:tommylemon@qq.com).
-
-<br />
-
-## <h2 id="7">7. Donating<h2/> 
-		
-If you like this projects and want to donate for maintainance cost, or want to buy me a coffee, you can scan Wechat QR code or QQ QR code below. <br />
-
-<img src="https://raw.githubusercontent.com/TommyLemon/StaticResources/master/pay/WechatPay.JPG"  width="240" ><img src="https://raw.githubusercontent.com/TommyLemon/StaticResources/master/pay/QQPay.JPG"  width="240" >
-<br />
-<br />
-### Contributers of this project:
-
-<div style="float:left">
-  <a href="https://github.com/TommyLemon"><img src="https://avatars1.githubusercontent.com/u/5738175?s=400&u=5b2f372f0c03fae8f249d2d754e38971c2e17b92&v=4" height="75" width="75" ></a>
-  <a href="https://github.com/TommyLemon/APIJSON/pull/41"><img src="https://avatars0.githubusercontent.com/u/39320217?s=460&v=4"  height="75" width="75" ></a>
-  <a href="https://github.com/TommyLemon/APIJSON/pull/43"><img src="https://avatars0.githubusercontent.com/u/23173448?s=460&v=4"  height="75" width="75" ></a>
-  <a href="https://github.com/TommyLemon/APIJSON/pull/47"><img src="https://avatars2.githubusercontent.com/u/31512287?s=400&v=4"  height="75" width="75" ></a>
-  <a href="https://github.com/TommyLemon/APIJSON/pull/70"><img src="https://avatars1.githubusercontent.com/u/22228201?s=400&v=4"  height="75" width="75" ></a>
-  <a href="https://github.com/TommyLemon/APIJSON/pull/74"><img src="https://avatars0.githubusercontent.com/u/1274536?s=400&v=4"  height="75" width="75" ></a>
-  <a href="https://github.com/APIJSON/APIJSON/pull/92"><img src="https://avatars3.githubusercontent.com/u/6327228?s=400&v=4"  height="75" width="75" ></a>
-  <a href="https://github.com/TommyLemon/APIJSON/pull/69"><img src="https://avatars0.githubusercontent.com/u/13880474?s=400&v=4"  height="75" width="75" ></a>
-  <a href="https://github.com/TommyLemon/APIJSON/pull/72"><img src="https://avatars1.githubusercontent.com/u/10663804?s=400&v=4"  height="75" width="75" ></a>
-  <a href="https://github.com/TommyLemon/APIJSON/pull/33"><img src="https://avatars1.githubusercontent.com/u/5328313?s=460&v=4"  height="75" width="75" ></a>
-  <br />
-  <a href="https://github.com/liaozb/APIJSON.NET"><img src="https://avatars3.githubusercontent.com/u/12622501?s=400&v=4"  height="75" width="75" ></a>
-  <a href="https://github.com/qq547057827/apijson-php"><img src="https://avatars3.githubusercontent.com/u/1657532?s=400&v=4"  height="75" width="75" ></a>
-  <a href="https://github.com/TEsTsLA/apijson"><img src="https://avatars2.githubusercontent.com/u/17310639?s=400&v=4"  height="75" width="75" ></a>
-  <a href="https://github.com/zhangchunlin/uliweb-apijson"><img src="https://avatars0.githubusercontent.com/u/359281?s=400&v=4"  height="75" width="75" ></a>
-  <a href="https://github.com/crazytaxi824/APIJSON"><img src="https://avatars3.githubusercontent.com/u/16500384?s=400&v=4"  height="75" width="75" ></a>
-  <a href="https://github.com/luckyxiaomo/APIJSONKOTLIN"><img src="https://avatars2.githubusercontent.com/u/42728605?s=400&v=4"  height="75" width="75" ></a>
-    <a href="https://gitee.com/zhiyuexin/ApiJsonByJFinal"><img src="https://avatar.gitee.com/uploads/90/490_zhiyuexin.jpg!avatar100?1368664499"  height="75" width="75" ></a>
-  <a href="https://github.com/Airforce-1/SpringServer1.2-APIJSON"><img src="https://avatars3.githubusercontent.com/u/6212428?s=400&v=4"  height="75" width="75" ></a>
-</div>
-<br />
-	

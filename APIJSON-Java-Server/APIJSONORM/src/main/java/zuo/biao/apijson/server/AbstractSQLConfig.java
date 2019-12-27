@@ -22,6 +22,7 @@ import static zuo.biao.apijson.JSONObject.KEY_CACHE;
 import static zuo.biao.apijson.JSONObject.KEY_FROM;
 import static zuo.biao.apijson.JSONObject.KEY_GROUP;
 import static zuo.biao.apijson.JSONObject.KEY_HAVING;
+import static zuo.biao.apijson.JSONObject.KEY_JSON;
 import static zuo.biao.apijson.JSONObject.KEY_ID;
 import static zuo.biao.apijson.JSONObject.KEY_ORDER;
 import static zuo.biao.apijson.JSONObject.KEY_ROLE;
@@ -48,6 +49,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import javax.activation.UnsupportedDataTypeException;
+
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.annotation.JSONField;
@@ -61,8 +64,11 @@ import zuo.biao.apijson.SQL;
 import zuo.biao.apijson.StringUtil;
 import zuo.biao.apijson.server.exception.NotExistException;
 import zuo.biao.apijson.server.model.Column;
+import zuo.biao.apijson.server.model.ExtendedProperty;
 import zuo.biao.apijson.server.model.PgAttribute;
 import zuo.biao.apijson.server.model.PgClass;
+import zuo.biao.apijson.server.model.SysColumn;
+import zuo.biao.apijson.server.model.SysTable;
 import zuo.biao.apijson.server.model.Table;
 
 /**config sql for JSON Request
@@ -71,6 +77,7 @@ import zuo.biao.apijson.server.model.Table;
 public abstract class AbstractSQLConfig implements SQLConfig {
 	private static final String TAG = "AbstractSQLConfig";
 
+	public static String DEFAULT_DATABASE = DATABASE_MYSQL;
 	public static String DEFAULT_SCHEMA = "sys";
 	public static String PREFFIX_DISTINCT = "DISTINCT ";
 
@@ -78,12 +85,27 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 	 * 表名映射，隐藏真实表名，对安全要求很高的表可以这么做
 	 */
 	public static final Map<String, String> TABLE_KEY_MAP;
+	public static final List<String> DATABASE_LIST;
 	static {
 		TABLE_KEY_MAP = new HashMap<String, String>();
 		TABLE_KEY_MAP.put(Table.class.getSimpleName(), Table.TABLE_NAME);
 		TABLE_KEY_MAP.put(Column.class.getSimpleName(), Column.TABLE_NAME);
-		TABLE_KEY_MAP.put(PgAttribute.class.getSimpleName(), PgAttribute.TABLE_NAME);
 		TABLE_KEY_MAP.put(PgClass.class.getSimpleName(), PgClass.TABLE_NAME);
+		TABLE_KEY_MAP.put(PgAttribute.class.getSimpleName(), PgAttribute.TABLE_NAME);
+		TABLE_KEY_MAP.put(SysTable.class.getSimpleName(), SysTable.TABLE_NAME);
+		TABLE_KEY_MAP.put(SysColumn.class.getSimpleName(), SysColumn.TABLE_NAME);
+		TABLE_KEY_MAP.put(ExtendedProperty.class.getSimpleName(), ExtendedProperty.TABLE_NAME);
+
+		DATABASE_LIST = new ArrayList<>();
+		DATABASE_LIST.add(DATABASE_MYSQL);
+		DATABASE_LIST.add(DATABASE_POSTGRESQL);
+		DATABASE_LIST.add(DATABASE_SQLSERVER);
+		DATABASE_LIST.add(DATABASE_ORACLE);
+	}
+
+	@Override
+	public boolean limitSQLCount() {
+		return Log.DEBUG == false || AbstractVerifier.SYSTEM_ACCESS_MAP.containsKey(getTable()) == false;
 	}
 
 	@NotNull
@@ -114,6 +136,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 	private String group; //分组方式的字符串数组，','分隔
 	private String having; //聚合函数的字符串数组，','分隔
 	private String order; //排序方式的字符串数组，','分隔
+	private List<String> json; //需要转为 JSON 的字段，','分隔
 	private Subquery from; //子查询临时表
 	private List<String> column; //表内字段名(或函数名，仅查询操作可用)的字符串数组，','分隔
 	private List<List<Object>> values; //对应表内字段的值的字符串数组，','分隔
@@ -224,7 +247,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		this.distinct = distinct;
 		return this;
 	}
-	
+
 	@Override
 	public String getDatabase() {
 		return database;
@@ -234,30 +257,73 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		this.database = database;
 		return this;
 	}
+	/**
+	 * @return db == null ? DEFAULT_DATABASE : db
+	 */
+	@NotNull
+	public String getSQLDatabase() {
+		String db = getDatabase();
+		return db == null ? DEFAULT_DATABASE : db;  // "" 表示已设置，不需要用全局默认的 StringUtil.isEmpty(db, false)) {
+	}
+
+	@Override
+	public boolean isMySQL() {
+		return isMySQL(getSQLDatabase());
+	}
+	public static boolean isMySQL(String db) {
+		return DATABASE_MYSQL.equals(db);
+	}
+	@Override
+	public boolean isPostgreSQL() {
+		return isPostgreSQL(getSQLDatabase());
+	}
+	public static boolean isPostgreSQL(String db) {
+		return DATABASE_POSTGRESQL.equals(db);
+	}
+	@Override
+	public boolean isSQLServer() {
+		return isSQLServer(getSQLDatabase());
+	}
+	public static boolean isSQLServer(String db) {
+		return DATABASE_SQLSERVER.equals(db);
+	}
+	@Override
+	public boolean isOracle() {
+		return isOracle(getSQLDatabase());
+	}
+	public static boolean isOracle(String db) {
+		return DATABASE_ORACLE.equals(db);
+	}
 
 	@Override
 	public String getQuote() {
-		return DATABASE_POSTGRESQL.equals(getDatabase()) ? "\"" : "`";
+		return isMySQL() ? "`" : "\"";
 	}
 
 	@Override
 	public String getSchema() {
 		return schema;
 	}
-	public String getSQLSchema(String sqlTable) {
+	/**
+	 * @param sqlTable
+	 * @return
+	 */
+	@NotNull
+	public String getSQLSchema() {
+		String table = getTable();
 		//强制，避免因为全局默认的 @schema 自动填充进来，导致这几个类的 schema 为 sys 等其它值
-		if ((Table.TABLE_NAME.equals(sqlTable) || Column.TABLE_NAME.equals(sqlTable)) ) {
-			return SCHEMA_INFORMATION;
+		if (Table.TAG.equals(table) || Column.TAG.equals(table)) {
+			return SCHEMA_INFORMATION; //MySQL, PostgreSQL, SQL Server 都有的
 		}
-		if ((PgAttribute.TABLE_NAME.equals(sqlTable) || PgClass.TABLE_NAME.equals(sqlTable)) ) {
-			return "";
+		if (PgClass.TAG.equals(table) || PgAttribute.TAG.equals(table)) {
+			return ""; //PostgreSQL 的 pg_class 和 pg_attribute 表好像不属于任何 Schema
+		}
+		if (SysTable.TAG.equals(table) || SysColumn.TAG.equals(table) || ExtendedProperty.TAG.equals(table)) {
+			return SCHEMA_SYS; //SQL Server 在 sys 中的属性比 information_schema 中的要全，能拿到注释
 		}
 
 		String sch = getSchema();
-		if (sch == null) { //PostgreSQL 的 pg_class 和 pg_attribute 表好像不属于任何 Schema  StringUtil.isEmpty(sch, true)) {
-			sch = DEFAULT_SCHEMA;
-		}
-		return sch;
+		return sch == null ? DEFAULT_SCHEMA : sch;
 	}
 	@Override
 	public AbstractSQLConfig setSchema(String schema) {
@@ -295,8 +361,8 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 	public String getTablePath() {
 		String q = getQuote();
 
+		String sch = getSQLSchema();
 		String sqlTable = getSQLTable();
-		String sch = getSQLSchema(sqlTable);
 
 		return (StringUtil.isEmpty(sch, true) ? "" : q + sch + q + ".") + q + sqlTable + q + ( isKeyPrefix() ? " AS " + getAliasWithQuote() : "");
 	}
@@ -305,7 +371,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		this.table = table;
 		return this;
 	}
-	
+
 	@Override
 	public String getAlias() {
 		return alias;
@@ -538,7 +604,39 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		}
 
 
-		order = StringUtil.getTrimedString(order);
+		String order = StringUtil.getTrimedString(getOrder());
+
+		if (getCount() > 0 && (isOracle() || isSQLServer())) { // Oracle 和 SQL Server 的 OFFSET 必须加 ORDER BY
+
+			//			String[] ss = StringUtil.split(order);
+			if (StringUtil.isEmpty(order, true)) {  //SQL Server 子查询内必须指定 OFFSET 才能用 ORDER BY
+				String idKey = getIdKey();
+				if (StringUtil.isEmpty(idKey, true)) {
+					idKey = "id"; //ORDER BY NULL 不行，SQL Server 会报错，必须要有排序，才能使用 OFFSET FETCH，如果没有 idKey，请求中指定 @order 即可
+				}
+				order = idKey; //让数据库调控默认升序还是降序  + "+";
+			}
+
+			//不用这么全面，毕竟没有语法问题还浪费性能，如果有其它问题，让前端传的 JSON 直接加上 @order 来解决
+			//			boolean contains = false;
+			//			if (ss != null) {
+			//				for (String s : ss) {
+			//					if (s != null && s.startsWith(idKey)) {
+			//						s = s.substring(idKey.length());
+			//						if ("+".equals(s) || "-".equals(s)) {// || " ASC ".equals(s) || " DESC ".equals(s)) {
+			//							contains = true;
+			//							break;
+			//						}
+			//					}
+			//				}
+			//			}
+
+			//			if (contains == false) {
+			//				order = (ss == null || ss.length <= 0 ? "" : order + ",") + idKey + "+";
+			//			}
+		}
+
+
 		if (order.contains("+")) {//replace没有包含的replacement会崩溃
 			order = order.replaceAll("\\+", " ASC ");
 		}
@@ -578,6 +676,17 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 	}
 
 
+	@Override
+	public List<String> getJson() {
+		return json;
+	}
+	@Override
+	public AbstractSQLConfig setJson(List<String> json) {
+		this.json = json;
+		return this;
+	}
+	
+	
 	@Override
 	public Subquery getFrom() {
 		return from;
@@ -659,7 +768,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 					else {
 						cfg = j.getJoinConfig();
 					}
-					
+
 					if (StringUtil.isEmpty(cfg.getAlias(), true)) {
 						cfg.setAlias(cfg.getTable());
 					}
@@ -731,7 +840,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 						index = isColumn ? ckeys[j].lastIndexOf(":") : -1; //StringUtil.split返回数组中，子项不会有null
 						origin = index < 0 ? ckeys[j] : ckeys[j].substring(0, index);
 						alias = index < 0 ? null : ckeys[j].substring(index + 1);
-						
+
 						distinct = j <= 0 && origin.startsWith(PREFFIX_DISTINCT);
 						if (distinct) {
 							origin = origin.substring(PREFFIX_DISTINCT.length());
@@ -747,17 +856,29 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 								}
 							}
 							else {
-								if ((StringUtil.isName(origin) == false || origin.startsWith("_"))) {
+//								if ((StringUtil.isName(origin) == false || origin.startsWith("_"))) {
+								if (origin.startsWith("_") || PATTERN_FUNCTION.matcher(origin).matches() == false) {
 									throw new IllegalArgumentException("字符 " + ckeys[j] + " 不合法！"
 											+ "预编译模式下 @column:\"column0,column1:alias;function0(arg0,arg1,...);function1(...):alias...\""
-											+ " 中所有 arg 都必须是1个不以 _ 开头的单词！DISTINCT 必须全大写，且后面必须有且只有 1 个空格！其它情况不允许空格！");
+											+ " 中所有 arg 都必须是1个不以 _ 开头的单词 或者符合正则表达式 " + PATTERN_FUNCTION + " ！DISTINCT 必须全大写，且后面必须有且只有 1 个空格！其它情况不允许空格！");
 								}
 							}
 						}
 
 						//JOIN 副表不再在外层加副表名前缀 userId AS `Commet.userId`， 而是直接 userId AS `userId`
-						origin = quote + origin + quote;
-						if (isKeyPrefix()) {
+						boolean isName = false;
+						if (StringUtil.isNumer(origin)) {
+							//do nothing
+						}
+						else if (StringUtil.isName(origin)) {
+							origin = quote + origin + quote;
+							isName = true;
+						} 
+						else {
+							origin = getValue(origin).toString();
+						}
+						
+						if (isName && isKeyPrefix()) {
 							ckeys[j] = tableAlias + "." + origin;
 							//							if (isColumn) {
 							//								ckeys[j] += " AS " + quote + (isMain() ? "" : tableAlias + ".") + (StringUtil.isEmpty(alias, true) ? origin : alias) + quote;
@@ -768,7 +889,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 						} else {
 							ckeys[j] = origin + (StringUtil.isEmpty(alias, true) ? "" : " AS " + quote + alias + quote);
 						}
-						
+
 						if (distinct) {
 							ckeys[j] = PREFFIX_DISTINCT + ckeys[j];
 						}
@@ -810,7 +931,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 			}
 
 			String c = StringUtil.getString(keys);
-			c = (c.contains(":") == false ? c : c.replaceAll(":", " AS ")) + (StringUtil.isEmpty(joinColumn, true) ? "" : ", " + joinColumn);//不能在这里改，后续还要用到:
+			c = c + (StringUtil.isEmpty(joinColumn, true) ? "" : ", " + joinColumn);//不能在这里改，后续还要用到:
 			return isMain() && isDistinct() ? PREFFIX_DISTINCT + c : c;
 		default:
 			throw new UnsupportedOperationException(
@@ -909,7 +1030,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		this.type = type;
 		return this;
 	}
-	
+
 	@Override
 	public int getCache() {
 		return cache;
@@ -926,9 +1047,9 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 			cache2 = JSONRequest.CACHE_ALL;
 		}
 		else {
-//			if (isSubquery) {
-//				throw new IllegalArgumentException("子查询内不支持传 " + JSONRequest.KEY_CACHE + "!");
-//			}
+			//			if (isSubquery) {
+			//				throw new IllegalArgumentException("子查询内不支持传 " + JSONRequest.KEY_CACHE + "!");
+			//			}
 
 			switch (cache) {
 			case "0":
@@ -950,7 +1071,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		setCache(cache2);
 		return this;
 	}
-	
+
 	@Override
 	public boolean isExplain() {
 		return explain;
@@ -960,7 +1081,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		this.explain = explain;
 		return this;
 	}
-	
+
 	@Override
 	public List<Join> getJoinList() {
 		return joinList;
@@ -1006,14 +1127,23 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 	 */
 	@JSONField(serialize = false)
 	public String getLimitString() {
-		return getLimitString(getPage(), getCount());// + 1);
+		if (count <= 0 || RequestMethod.isHeadMethod(getMethod(), true)) {
+			return "";
+		}
+		return getLimitString(getPage(), getCount(), isOracle() || isSQLServer());
 	}
 	/**获取限制数量
 	 * @param limit
 	 * @return
 	 */
-	public static String getLimitString(int page, int count) {
-		return count <= 0 ? "" : " LIMIT " + count + " OFFSET " + getOffset(page, count);
+	public static String getLimitString(int page, int count, boolean isTSQL) {
+		int offset = getOffset(page, count);
+
+		if (isTSQL) {
+			return " OFFSET " + offset + " ROWS FETCH FIRST " + count + " ROWS ONLY";
+		}
+
+		return " LIMIT " + count + " OFFSET " + offset;
 	}
 
 	//WHERE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -1200,7 +1330,10 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 
 				isItemFirst = false;
 			}
-
+			
+			if (StringUtil.isEmpty(cs, true)) {//避免SQL条件连接错误
+				continue;
+			}
 
 			whereString += (isCombineFirst ? "" : AND) + (Logic.isNot(logic) ? NOT : "") + " (  " + cs + "  ) ";
 			isCombineFirst = false;
@@ -1424,10 +1557,10 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 			preparedValueList.add(value);
 			return "?";
 		}
-//		return (value instanceof Number || value instanceof Boolean) && DATABASE_POSTGRESQL.equals(getDatabase()) ? value :  "'" + value + "'";
+		//		return (value instanceof Number || value instanceof Boolean) && DATABASE_POSTGRESQL.equals(getDatabase()) ? value :  "'" + value + "'";
 		return (value instanceof Number || value instanceof Boolean) ? value :  "'" + value + "'"; //MySQL 隐式转换用不了索引
 	}
-	
+
 	@Override
 	public List<Object> getPreparedValueList() {
 		return preparedValueList;
@@ -1553,8 +1686,11 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 	 */
 	@JSONField(serialize = false)
 	public String getRegExpString(String key, String value, boolean ignoreCase) {
-		if (DATABASE_POSTGRESQL.equals(getDatabase())) {
+		if (isPostgreSQL()) {
 			return getKey(key) + " ~" + (ignoreCase ? "* " : " ") + getValue(value);
+		}
+		if (isOracle()) {
+			return "regexp_like(" + getKey(key) + ", " + getValue(value) + (ignoreCase ? ", 'i'" : ", 'c'") + ")";
 		}
 		return getKey(key) + " REGEXP " + (ignoreCase ? "" : "BINARY ") + getValue(value);
 	}
@@ -1640,10 +1776,12 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 
 	// * 和 / 不能同时出现，防止 /* */ 段注释！ # 和 -- 不能出现，防止行注释！ ; 不能出现，防止隔断SQL语句！空格不能出现，防止 CRUD,DROP,SHOW TABLES等语句！
 	private static final Pattern PATTERN_RANGE;
+	private static final Pattern PATTERN_FUNCTION;
 	private static final Pattern PATTERN_HAVING;
 	private static final Pattern PATTERN_HAVING_SUFFIX;
 	static {
 		PATTERN_RANGE = Pattern.compile("^[0-9%!=<>,]+$"); // ^[a-zA-Z0-9_*%!=<>(),"]+$ 导致 exists(select*from(Comment)) 通过！
+		PATTERN_FUNCTION = Pattern.compile("^[A-Za-z0-9%-_:!=<> ]+$"); //TODO 改成更好的正则，校验前面为单词，中间为操作符，后面为值
 		PATTERN_HAVING = Pattern.compile("^[A-Za-z0-9%!=<>]+$"); //TODO 改成更好的正则，校验前面为单词，中间为操作符，后面为值
 		PATTERN_HAVING_SUFFIX = Pattern.compile("^[0-9%!=<>]+$"); // ^[a-zA-Z0-9_*%!=<>(),"]+$ 导致 exists(select*from(Comment)) 通过！
 	}
@@ -1664,29 +1802,42 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		}
 
 		Logic logic = new Logic(key);
-		key = logic.getKey();
-		Log.i(TAG, "getRangeString key = " + key);
+		String k = logic.getKey();
+		Log.i(TAG, "getRangeString k = " + k);
 
 		if (range instanceof List) {
 			if (logic.isOr() || logic.isNot()) {
-				return getKey(key) + getInString(key, ((List<?>) range).toArray(), logic.isNot());
+				List<?> l = (List<?>) range;
+				if (logic.isNot() && l.isEmpty()) {
+					return ""; // key!{}: [] 这个条件无效，加到 SQL 语句中 key IN() 会报错，getInString 里不好处理
+				}
+				return getKey(k) + getInString(k, l.toArray(), logic.isNot());
 			}
-			throw new IllegalArgumentException(key + "{}\":[] 中key末尾的逻辑运算符只能用'|','!'中的一种 ！");
+			throw new IllegalArgumentException(key + "{}\":[] 中 {} 前面的逻辑运算符错误！只能用'|','!'中的一种 ！");
 		}
 		else if (range instanceof String) {//非Number类型需要客户端拼接成 < 'value0', >= 'value1'这种
-			if (isPrepared() && PATTERN_RANGE.matcher((String) range).matches() == false) {
-				throw new UnsupportedOperationException("字符串 " + range + " 不合法！预编译模式下 key{}:\"condition\" 中 condition 必须符合正则表达式 ^[0-9%!=<>,]+$ ！不允许空格！");
-			}
-
-			String[] conditions = StringUtil.split((String) range);
+			String[] cs = StringUtil.split((String) range);
 			String condition = "";
-			if (conditions != null) {
+			if (cs != null) {
+				String c;
 				int index;
-				for (int i = 0; i < conditions.length; i++) {//对函数条件length(key)<=5这种不再在开头加key
-					index = conditions[i] == null ? -1 : conditions[i].indexOf("(");
+				for (int i = 0; i < cs.length; i++) {//对函数条件length(key)<=5这种不再在开头加key
+					c = cs[i];
+					if ("=null".equals(c)) {
+						c = SQL.isNull();
+					}
+					else if ("!=null".equals(c)) {
+						c = SQL.isNull(false);
+					}
+					else if (isPrepared() && PATTERN_RANGE.matcher(c).matches() == false) {
+						throw new UnsupportedOperationException(key + "{}:value 的 value 中 " + c + " 不合法！"
+								+ "预编译模式下 key{}:\"condition\" 中 condition 必须 为 =null 或 !=null 或 符合正则表达式 ^[0-9%!=<>,]+$ ！不允许空格！");
+					}
+
+					index = c == null ? -1 : c.indexOf("(");
 					condition += ((i <= 0 ? "" : (logic.isAnd() ? AND : OR))//连接方式
-							+ (index >= 0 && index < conditions[i].indexOf(")") ? "" : getKey(key) + " ")//函数和非函数条件
-							+ conditions[i]);//单个条件
+							+ (index >= 0 && index < c.indexOf(")") ? "" : getKey(k) + " ")//函数和非函数条件
+							+ c);//单个条件
 				}
 			}
 			if (condition.isEmpty()) {
@@ -1696,7 +1847,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 			return getCondition(logic.isNot(), condition);
 		}
 		else if (range instanceof Subquery) { //如果在 Parser 解析成 SQL 字符串再引用，没法保证安全性，毕竟可以再通过远程函数等方式来拼接再替代，最后引用的字符串就能注入
-			return getKey(key) + (logic.isNot() ? NOT : "") + " IN " + getSubqueryString((Subquery) range);
+			return getKey(k) + (logic.isNot() ? NOT : "") + " IN " + getSubqueryString((Subquery) range);
 		}
 
 		throw new IllegalArgumentException(key + "{}:range 类型为" + range.getClass().getSimpleName()
@@ -1788,12 +1939,15 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 						throw new IllegalArgumentException(key + "<>:value 中value类型不能为JSON！");
 					}
 
-					if (DATABASE_POSTGRESQL.equals(getDatabase())) {
-						condition += (i <= 0 ? "" : (Logic.isAnd(type) ? AND : OR))
-								+ getKey(key) + " @> " + getValue(newJSONArray(childs[i])); //operator does not exist: jsonb @> character varying  "[" + childs[i] + "]"); 
-					} else {
-						condition += (i <= 0 ? "" : (Logic.isAnd(type) ? AND : OR))
-								+ "json_contains(" + getKey(key) + ", " + getValue(childs[i].toString()) + ")";
+					condition += (i <= 0 ? "" : (Logic.isAnd(type) ? AND : OR));
+					if (isPostgreSQL()) {
+						condition += (getKey(key) + " @> " + getValue(newJSONArray(childs[i]))); //operator does not exist: jsonb @> character varying  "[" + childs[i] + "]"); 
+					}
+					else if (isOracle()) {
+						condition += ("json_textcontains(" + getKey(key) + ", '$', " + getValue(childs[i].toString()) + ")");
+					}
+					else {
+						condition += ("json_contains(" + getKey(key) + ", " + getValue(childs[i].toString()) + ")");
 					}
 				}
 			}
@@ -1903,7 +2057,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 				value = content.get(key);
 				key = getRealKey(method, key, false, true, verifyName, quote);
 
-				setString += (isFirst ? "" : ", ") + (getKey(key) + "=" + (keyType == 1 ? getAddString(key, value) : (keyType == 2
+				setString += (isFirst ? "" : ", ") + (getKey(key) + " = " + (keyType == 1 ? getAddString(key, value) : (keyType == 2
 						? getRemoveString(key, value) : getValue(value)) ) );
 
 				isFirst = false;
@@ -1916,10 +2070,10 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		return " SET " + setString;
 	}
 
-	/**SET key = CONCAT (key, 'value')
+	/**SET key = concat(key, 'value')
 	 * @param key
 	 * @param value
-	 * @return CONCAT (key, 'value')
+	 * @return concat(key, 'value')
 	 * @throws IllegalArgumentException
 	 */
 	@JSONField(serialize = false)
@@ -1928,7 +2082,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 			return getKey(key) + " + " + value;
 		}
 		if (value instanceof String) {
-			return " CONCAT (" + getKey(key) + ", " + getValue(value) + ") ";
+			return SQL.concat(getKey(key), (String) getValue(value));
 		}
 		throw new IllegalArgumentException(key + "+ 对应的值 " + value + " 不是Number,String,Array中的任何一种！");
 	}
@@ -1944,7 +2098,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 			return getKey(key) + " - " + value;
 		}
 		if (value instanceof String) {
-			return SQL.replace(getKey(key), (String) getValue(value), "");// " replace(" + key + ", '" + value + "', '') ";
+			return SQL.replace(getKey(key), (String) getValue(value), "''");// " replace(" + key + ", '" + value + "', '') ";
 		}
 		throw new IllegalArgumentException(key + "- 对应的值 " + value + " 不是Number,String,Array中的任何一种！");
 	}
@@ -1975,7 +2129,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		// for (...) { Call procedure1();\n SQL \n; Call procedure2(); ... }
 		// 貌似不需要，因为 ObjecParser 里就已经处理的顺序等，只是这里要解决下 Schema 问题。
 
-		String sch = config.getSQLSchema(config.getSQLTable());
+		String sch = config.getSQLSchema();
 		if (StringUtil.isNotEmpty(config.getProcedure(), true)) {
 			String q = config.getQuote();
 			return "CALL " + q + sch + q + "."+ config.getProcedure();
@@ -1997,7 +2151,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		default:
 			config.setPreparedValueList(new ArrayList<Object>());
 			String column = config.getColumnString();
-			return (config.isExplain() ? "EXPLAIN " : "") + "SELECT " + (config.getCache() == JSONRequest.CACHE_RAM ? "SQL_NO_CACHE " : "") + column + " FROM " + getConditionString(column, tablePath, config);
+			return (config.isExplain() ? (config.isSQLServer() || config.isOracle() ? "SET STATISTICS PROFILE ON  " : "EXPLAIN ") : "") + "SELECT " + (config.getCache() == JSONRequest.CACHE_RAM ? "SQL_NO_CACHE " : "") + column + " FROM " + getConditionString(column, tablePath, config);
 		}
 	}
 
@@ -2161,7 +2315,17 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		if (request == null) { // User:{} 这种空内容在查询时也有效
 			throw new NullPointerException(TAG + ": newSQLConfig  request == null!");
 		}
+
+		boolean explain = request.getBooleanValue(KEY_EXPLAIN);
+		if (explain && Log.DEBUG == false) { //不在 config.setExplain 抛异常，一方面处理更早性能更好，另一方面为了内部调用可以绕过这个限制
+			throw new UnsupportedOperationException("DEBUG 模式下不允许传 " + KEY_EXPLAIN + " ！");
+		}
+
 		String database = request.getString(KEY_DATABASE);
+		if (StringUtil.isEmpty(database, false) == false && DATABASE_LIST.contains(database) == false) {
+			throw new UnsupportedDataTypeException("@database:value 中 value 错误，只能是 [" + StringUtil.getString(DATABASE_LIST.toArray()) + "] 中的一种！");
+		}
+
 		String schema = request.getString(KEY_SCHEMA);
 
 		AbstractSQLConfig config = callback.getSQLConfig(method, database, schema, table);
@@ -2170,18 +2334,16 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		config.setDatabase(database); //不删，后面表对象还要用的，必须放在 parseJoin 前
 		config.setSchema(schema); //不删，后面表对象还要用的
 
-		//放后面会导致主表是空对象时 joinList 未解析
-		if (isProcedure == false) {
-			config = parseJoin(method, config, joinList, callback);
+		if (isProcedure) {
+			return config;
 		}
+
+		config = parseJoin(method, config, joinList, callback); //放后面会导致主表是空对象时 joinList 未解析
 
 		if (request.isEmpty()) { // User:{} 这种空内容在查询时也有效
 			return config; //request.remove(key); 前都可以直接return，之后必须保证 put 回去
 		}
 
-		if (isProcedure) {
-			return config;
-		}
 
 		String idKey = callback.getIdKey(database, schema, table);
 		String idInKey = idKey + "{}";
@@ -2237,7 +2399,6 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 
 
 		String role = request.getString(KEY_ROLE);
-		boolean explain = request.getBooleanValue(KEY_EXPLAIN);
 		String cache = request.getString(KEY_CACHE);
 		String combine = request.getString(KEY_COMBINE);
 		Subquery from = (Subquery) request.get(KEY_FROM);
@@ -2245,6 +2406,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		String group = request.getString(KEY_GROUP);
 		String having = request.getString(KEY_HAVING);
 		String order = request.getString(KEY_ORDER);
+		String json = request.getString(KEY_JSON);
 
 		//强制作为条件且放在最前面优化性能
 		request.remove(idKey);
@@ -2261,6 +2423,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		request.remove(KEY_GROUP);
 		request.remove(KEY_HAVING);
 		request.remove(KEY_ORDER);
+		request.remove(KEY_JSON);
 
 
 		Map<String, Object> tableWhere = new LinkedHashMap<String, Object>();//保证顺序好优化 WHERE id > 1 AND name LIKE...
@@ -2417,7 +2580,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		}
 
 		boolean distinct = column == null ? false : column.startsWith(PREFFIX_DISTINCT);
-		
+
 		List<String> cs = new ArrayList<>();
 		String[] fks = StringUtil.split(distinct ? column.substring(PREFFIX_DISTINCT.length()) : column, ";"); // key0,key1;fun0(key0,...);fun1(key0,...);key3;fun2(key0,...)
 		if (fks != null) {
@@ -2449,6 +2612,9 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		config.setGroup(group);
 		config.setHaving(having);
 		config.setOrder(order);
+		
+		String[] jsonArr = StringUtil.split(json);
+		config.setJson(jsonArr == null || jsonArr.length <= 0 ? null : new ArrayList<>(Arrays.asList(jsonArr)));
 
 		//TODO 解析JOIN，包括 @column，@group 等要合并
 
@@ -2468,12 +2634,13 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		request.put(KEY_GROUP, group);
 		request.put(KEY_HAVING, having);
 		request.put(KEY_ORDER, order);
+		request.put(KEY_JSON, json);
 
 		return config;
 	}
 
-	
-	
+
+
 	/**
 	 * @param method
 	 * @param config
@@ -2600,7 +2767,7 @@ public abstract class AbstractSQLConfig implements SQLConfig {
 		else if (key.endsWith("<>")) {//包含 json_contains，或者说value处于key对应值的范围内。查询时处理
 			key = key.substring(0, key.length() - 2);
 		} 
-		else if (key.endsWith("()")) {//方法，查询完后处理，先用一个Map<key,function>保存？
+		else if (key.endsWith("()")) {//方法，查询完后处理，先用一个Map<key,function>保存
 			key = key.substring(0, key.length() - 2);
 		} 
 		else if (key.endsWith("@")) {//引用，引用对象查询完后处理。fillTarget中暂时不用处理，因为非GET请求都是由给定的id确定，不需要引用

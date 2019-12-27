@@ -15,7 +15,6 @@ limitations under the License.*/
 package zuo.biao.apijson.server;
 
 import static zuo.biao.apijson.JSONObject.KEY_COMBINE;
-import static zuo.biao.apijson.JSONObject.KEY_CORRECT;
 import static zuo.biao.apijson.JSONObject.KEY_DROP;
 import static zuo.biao.apijson.JSONObject.KEY_TRY;
 import static zuo.biao.apijson.RequestMethod.PUT;
@@ -24,7 +23,6 @@ import static zuo.biao.apijson.server.SQLConfig.TYPE_ITEM;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -78,7 +76,6 @@ public abstract class AbstractObjectParser implements ObjectParser {
 	 * TODO Parser内要不因为 非 TYPE_ITEM_CHILD_0 的Table 为空导致后续中断。
 	 */
 	protected final boolean drop;
-	protected final JSONObject correct;
 
 	/**for single object
 	 * @param parentPath
@@ -98,7 +95,7 @@ public abstract class AbstractObjectParser implements ObjectParser {
 		this.type = arrayConfig == null ? 0 : arrayConfig.getType();
 		this.joinList = arrayConfig == null ? null : arrayConfig.getJoinList();
 		this.path = AbstractParser.getAbsPath(parentPath, name);
-		
+
 		zuo.biao.apijson.server.Entry<String, String> entry = Pair.parseEntry(name, true);
 		this.table = entry.getKey();
 		this.alias = entry.getValue();
@@ -111,25 +108,13 @@ public abstract class AbstractObjectParser implements ObjectParser {
 		if (isEmpty) {
 			this.tri = false;
 			this.drop = false;
-			this.correct = null;
 		}
 		else {
 			this.tri = request.getBooleanValue(KEY_TRY);
 			this.drop = request.getBooleanValue(KEY_DROP);
-			this.correct = request.getJSONObject(KEY_CORRECT);
 
 			request.remove(KEY_TRY);
 			request.remove(KEY_DROP);
-			request.remove(KEY_CORRECT);
-
-			try {
-				parseCorrect();
-			} catch (Exception e) {
-				if (tri == false) {
-					throw e;
-				}
-				invalidate();
-			}
 		}
 
 
@@ -140,49 +125,6 @@ public abstract class AbstractObjectParser implements ObjectParser {
 	public static final Map<String, Pattern> COMPILE_MAP;
 	static {
 		COMPILE_MAP = new HashMap<String, Pattern>();
-	}
-
-	protected Map<String, String> corrected;
-	/**解析 @correct 校正
-	 * @throws Exception 
-	 */
-	@Override
-	public AbstractObjectParser parseCorrect() throws Exception {
-		Set<String> set = correct == null ? null : new HashSet<>(correct.keySet());
-
-		if (set != null && set.isEmpty() == false) {//对每个需要校正的key进行正则表达式匹配校正
-			corrected = new HashMap<>();//TODO 返回全部correct内的内容，包括未校正的?  correct);
-
-			String value; //13000082001
-			String v; // phone,email,idCard
-			String[] posibleKeys; //[phone,email,idCard]
-
-			for (String k : set) {// k = cert
-				v = k == null ? null : correct.getString(k);
-				value = v == null ? null : request.getString(k);
-				posibleKeys = value == null ? null : StringUtil.split(v);
-
-				if (posibleKeys != null && posibleKeys.length > 0) {
-					String rk = null;
-					Pattern p;
-					for (String pk : posibleKeys) {
-						p = pk == null ? null : COMPILE_MAP.get(pk);
-						if (p != null && p.matcher(value).matches()) {
-							rk = pk;
-							break;
-						}
-					}
-
-					if (rk == null) {
-						throw new IllegalArgumentException("格式错误！找不到 " + k + ":" + value + " 对应[" + v + "]内的任何一项！");
-					}
-					request.put(rk, request.remove(k));
-					corrected.put(k, rk);
-				}
-			}
-		}
-
-		return this;
 	}
 
 
@@ -326,11 +268,13 @@ public abstract class AbstractObjectParser implements ObjectParser {
 				if (sqlRequest.get(JSONRequest.KEY_SCHEMA) == null && parser.getGlobleSchema() != null) {
 					sqlRequest.put(JSONRequest.KEY_SCHEMA, parser.getGlobleSchema());
 				}
-				if (sqlRequest.get(JSONRequest.KEY_EXPLAIN) == null && parser.getGlobleExplain() != null) {
-					sqlRequest.put(JSONRequest.KEY_EXPLAIN, parser.getGlobleExplain());
-				}
-				if (sqlRequest.get(JSONRequest.KEY_CACHE) == null && parser.getGlobleCache() != null) {
-					sqlRequest.put(JSONRequest.KEY_CACHE, parser.getGlobleCache());
+				if (isSubquery == false) {  //解决 SQL 语法报错，子查询不能 EXPLAIN
+					if (sqlRequest.get(JSONRequest.KEY_EXPLAIN) == null && parser.getGlobleExplain() != null) {
+						sqlRequest.put(JSONRequest.KEY_EXPLAIN, parser.getGlobleExplain());
+					}
+					if (sqlRequest.get(JSONRequest.KEY_CACHE) == null && parser.getGlobleCache() != null) {
+						sqlRequest.put(JSONRequest.KEY_CACHE, parser.getGlobleCache());
+					}
 				}
 			}
 		}
@@ -366,7 +310,7 @@ public abstract class AbstractObjectParser implements ObjectParser {
 				}
 
 
-				JSONArray arr = parser.onArrayParse(subquery, AbstractParser.getAbsPath(path, replaceKey), "[]", true);
+				JSONArray arr = parser.onArrayParse(subquery, path, key, true);
 
 				JSONObject obj = arr == null || arr.isEmpty() ? null : arr.getJSONObject(0);
 				if (obj == null) {
@@ -581,14 +525,11 @@ public abstract class AbstractObjectParser implements ObjectParser {
 		JSONObject rq = new JSONObject();
 		rq.put(JSONRequest.KEY_ID, request.get(JSONRequest.KEY_ID));
 		rq.put(JSONRequest.KEY_COLUMN, realKey);
-		JSONObject rp = parseResponse(new JSONRequest(table, rq));
+		JSONObject rp = parseResponse(RequestMethod.GET, table, null, rq, null, false);
 		//GET >>>>>>>>>>>>>>>>>>>>>>>>>
 
 
 		//add all 或 remove all <<<<<<<<<<<<<<<<<<<<<<<<<
-		if (rp != null) {
-			rp = rp.getJSONObject(table);
-		}
 		JSONArray targetArray = rp == null ? null : rp.getJSONArray(realKey);
 		if (targetArray == null) {
 			targetArray = new JSONArray();
@@ -616,6 +557,25 @@ public abstract class AbstractObjectParser implements ObjectParser {
 		sqlRequest.put(realKey, targetArray);
 		//PUT >>>>>>>>>>>>>>>>>>>>>>>>>
 
+	}
+
+	@Override
+	public JSONObject parseResponse(RequestMethod method, String table, String alias, JSONObject request, List<Join> joinList, boolean isProcedure) throws Exception {
+		SQLConfig config = newSQLConfig(method, table, alias, request, joinList, isProcedure);
+		return parseResponse(config, isProcedure);
+	}
+	@Override
+	public JSONObject parseResponse(SQLConfig config, boolean isProcedure) throws Exception {
+		if (parser.getSQLExecutor() == null) {
+			parser.createSQLExecutor();
+		}
+		return parser.getSQLExecutor().execute(config, isProcedure);
+	}
+
+
+	@Override
+	public SQLConfig newSQLConfig(boolean isProcedure) throws Exception {
+		return newSQLConfig(method, table, alias, sqlRequest, joinList, isProcedure);
 	}
 
 	/**SQL 配置，for single object
@@ -706,11 +666,6 @@ public abstract class AbstractObjectParser implements ObjectParser {
 		}
 
 
-		//把已校正的字段键值对corrected<originKey, correctedKey>添加进来，还是correct直接改？
-		if (corrected != null) {
-			response.put(KEY_CORRECT, corrected);
-		}
-
 		//把isTable时取出去的custom重新添加回来
 		if (customMap != null) {
 			response.putAll(customMap);
@@ -750,19 +705,10 @@ public abstract class AbstractObjectParser implements ObjectParser {
 		Object result;
 		if (key.startsWith("@")) { //TODO 以后这种小众功能从 ORM 移出，作为一个 plugin/APIJSONProcedure
 			FunctionBean fb = RemoteFunction.parseFunction(value, json, true);
-			
+
 			SQLConfig config = newSQLConfig(true);
 			config.setProcedure(fb.toFunctionCallString(true));
-
-			SQLExecutor executor = null;
-			try {
-				executor = parser.getSQLExecutor();
-				result = executor.execute(config, true);
-			}
-			catch (NotExistException e) {
-				e.printStackTrace();
-				return;
-			}
+			result = parseResponse(config, true);
 		}
 		else {
 			result = parser.onFunctionParse(json, value);
@@ -827,12 +773,8 @@ public abstract class AbstractObjectParser implements ObjectParser {
 		if (drop) {
 			request.put(KEY_DROP, drop);
 		}
-		if (correct != null) {
-			request.put(KEY_CORRECT, correct);
-		}
 
 
-		corrected = null;
 		method = null;
 		parentPath = null;
 		arrayConfig = null;

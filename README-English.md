@@ -3,8 +3,7 @@
   APIJSON
 </h1>
 
-<p align="center">🏆Gitee Most Valuable Project<br />🚀A JSON Transmission Protocol and an ORM Library for providing APIs and Documents automatically.</p>
-
+<p align="center">🏆Gitee The Most Valuable Project in 2019<br />🚀APIJSON is a JSON based internet communication protocol exclusively for API design and an ORM library based on this protocal. </p>
 
 <p align="center" >
   <a href="https://github.com/TommyLemon/APIJSON/tree/master/MySQL"><img src="https://img.shields.io/badge/MySQL-5.7%2B-brightgreen.svg?style=flat"></a>
@@ -56,18 +55,24 @@
 
 ## <h2 id= "1">1. About <h2/>
 
-APIJSON is a JSON based internet communication protocol and an ORM library that largely simplifies the process of back-end API development. It also allows users to get data more quickly with self-defined form and fewer endpoints requests.
+APIJSON is a JSON based internet communication protocol exclusively for API design and an ORM library based on this protocal. APIJSON can largely simplifies the process of API development. It helps developers to build an automatic API with functions like CRUD, data search.
+
+By saving communication time between front-end and back-end developers and hours of API development work, it largely reduces costs of API development.
+
+APIJSON is recommanded to small to medium web applications that have decoupled front and back ends, such as startup company projects or company internal use projects.
 
 ### Features:
-#### For getting data:
-You can get any data by defining the specific information you want and send it to the server.<br />
-You can get different types of data by making just one request to the server. It's very convenient and flexible, and dosen't require different API endpoints with multiple requests.<br />
-It provides CRUD(read and write), Fuzzy Search, Remote Function Calls，etc. You can also save duplicate data, see request history,etc.<br />
+#### For API developers:
 
-#### For API design:
-APIJSON largely reduces API developers' workload by reducing most api design and documentation work.<br />
-With APIJSON, client developers will no longer be suffered from possible errors in documents, and it saves communication between server developers and client developers about APIs or documentations .<br />
-Server developers no longer need to worry about compatibility of APIs and documents with legacy apps.
+- APIJSON largely reduces API developers’ workload by reducing most API protocals design work and documentation work.<br />
+- APIJSON supports automatic permission verification, version management and SQL injection prevention. The API has no version, so developers no longer need to worry about the update of API protocals or the derivative documentation update.<br />
+- With these features, it saves communication time between front-end and back-end developers about the API design.<br />
+
+#### For users:
+
+- You can get many resources and different forms of data by making just a single request While typical REST APIs require loading from multiple URLs. Being convenient and flexible, it saves sending multiple requests with multiple API endpoints.<br />
+- It provides CRUD(read and write), Fuzzy Search, Remote Method Invocation (RMI), etc. Other features include saving duplicate data, checking request history, etc.<br />
+
 
 ### Examples:
 #### Get a User
@@ -152,35 +157,35 @@ Response:
 
 [Test it online](http://apijson.cn/)<br />
 
-![](https://raw.githubusercontent.com/TommyLemon/StaticResources/master/APIJSON_Auto_get.jpg) 
+![](https://raw.githubusercontent.com/TommyLemon/StaticResources/master/APIJSON_Auto_get.jpg)
 
-![](https://raw.githubusercontent.com/TommyLemon/StaticResources/master/APIJSON_Auto_code.jpg) 
+![](https://raw.githubusercontent.com/TommyLemon/StaticResources/master/APIJSON_Auto_code.jpg)
 <p align="center" >
 
 
 ## <h2 id="2">2.Server-side deployment<h2/>
-		
+
 You can use either Eclipse for JavaEE or IntelllJ IDEA Ultimate to make installation. For both, first download the project and save it to a path.
 
 ### <h3 id="2.1">2.1 Installing with Eclipse<h3/>
 
 #### <h4 id="2.1.1">2.1.1 prerequisites<h4/>
-  
-Java Development Kit(JDK): 1.8 or above 
+
+Java Development Kit(JDK): 1.8 or above
 [MAVEN](https://maven.apache.org/download.cgi): 3.0 or above
 Mysql / Oracle
-[Eclipse Java EE IDE](https://www.eclipse.org/downloads/)for Web Developers.Version: Mars.1 Release (4.5.1) 
+[Eclipse Java EE IDE](https://www.eclipse.org/downloads/)for Web Developers.Version: Mars.1 Release (4.5.1)
 
 #### <h4 id="2.1.2">2.1.2 Opening the project with Eclipse<h4/>
-  
+
 Open Eclipse> *File > Import > Maven > Existing Maven Projects > Next > Browse > Select the path of the project you saved / APIJSON-Java-Server / APIJSONBoot > check pom.xml...apijson-demo > Finish*
-  
+
 #### <h4 id="2.1.3">2.1.3 Preparing the library used in demo<h4/>
-  
+
 In the menu at the right, click libs, right click apijson-orm.jar,click add as library. Apply the same to the rest *.jar* files in libs.
 
 #### <h4 id="2.1.4">2.1.4 Configuration<h4/>
-  
+
 Open apijson.demo.server.DemoSQLConfig. In line 40-61, change return values of `getDBUri`,`getDBAccount`,`getDBPassword`,`getSchema` to your own database.<br/>
 
 <pre><code class="language-java">
@@ -197,7 +202,7 @@ Open apijson.demo.server.DemoSQLConfig. In line 40-61, change return values of `
 	@Override
 	public String getDBPassword() {
   	//TODO: Change the return value to your own
-		return DATABASE_POSTGRESQL.equalsIgnoreCase(getDatabase()) ? null : "root"; 
+		return DATABASE_POSTGRESQL.equalsIgnoreCase(getDatabase()) ? null : "root";
 	}
 	@Override
 	public String getSchema() {
@@ -207,7 +212,7 @@ Open apijson.demo.server.DemoSQLConfig. In line 40-61, change return values of `
 </code></pre>
 
 **Note**: Instead of this step, you can also [import your database](#2.2).
-  
+
 #### <h4 id="2.1.5">2.1.5 Running the application<h4/>
 
 In Eclipse, in the menu on the top, click *Run>Run As>Java Application>choose APIJSONApplication>OK*
@@ -221,17 +226,17 @@ My config is Windows 7 + MySQL Community Server 5.7.16 + MySQLWorkbench 6.3.7 an
 Start *MySQLWorkbench > Enter a connection > Click Server menu > Data Import > Select the path of your .sql file > Start Import > Refresh SCHEMAS*. Now you should see tables are added successfully.
 
 ### <h3 id="2.3">2.3 Installing with IntellIJ IDEA Ultimate<h3/>
-  
+
 #### <h4 id="2.3.1">2.3.1 Opening the project<h4/>
 
 *Open > Select the path of the project/APIJSON-Java-Server/APIJSONBoot > OK*
 
-#### <h4 id="2.3.2">2.3.2 Preparing the library used in demo<h4/>  
-  
+#### <h4 id="2.3.2">2.3.2 Preparing the library used in demo<h4/>
+
 In libs, right-click *apijson-orm.jar >Add as Library>OK*. Apply this to all *.jar* files in libs.
 
 #### <h4 id="2.3.3">2.3.3 Running the application<h4/>
-  
+
 In the menu on the top: *Run > Run > Edit Configurations > + > Application > Configuration*<br />
 In *Main class* , choose *APIJSONApplication*;<br />
 In *Use classpath of module* , choose *apijson-demo*.<br />
@@ -241,10 +246,10 @@ Click *Run* in the bottom.
 
 <br />
 
-## <h2 id="3">3. Client-side deployment<h2/> 
-	
+## <h2 id="3">3. Client-side deployment<h2/>
+
 ### <h3 id="3.1">3.1 For Android<h3/>
-	
+
 Make sure you have either [ADT Bundle](https://stuff.mit.edu/afs/sipb/project/android/docs/sdk/installing/bundle.html) or [Android Studio](https://developer.android.com/studio) installed.<br />
 
 My config:  Windows 7 + JDK 1.7.0_71 + ADT Bundle 20140702 + Android Studio 2.2 and OSX EI Capitan + (JDK 1.7.0_71 + ADT Bundle 20140702) + (JDK 1.8.0_91 + Android Studio 2.1.2). All the systems and software are 64 bit.<br />
@@ -260,10 +265,10 @@ In the browser, send a request to the server. It should return with the result.
 If the default url is not available, change it to an available one, such as an IPV4 address that is running the server of the APIJSON project. Then click the request button again.
 
 ### <h3 id="3.2">3.2 For iOS<h3/>
-	
+
 Open xCode, then *APIJSON-Master/APIJSON-iOS/APIJSON-Swift > Open*<br/>
 
-In xCode, *Product > Run* 
+In xCode, *Product > Run*
 
 ### <h3 id="3.3">3.3 For Javascript<h3/>
 
@@ -271,8 +276,8 @@ You can use either an IDE or text editor like sublime, Atom, etc. Webstorm is re
 While using a text editor, you just open the .html file in the APIJSON-JS folder.<br/>
 You can also open it with Vue javascript framework. Click [here](https://vuejs.org/) to learn more.
 
-## <h2 id="4">4. Contributing<h2/> 
-	
+## <h2 id="4">4. Contributing<h2/>
+
 We are always looking for more developers to help implementing new features, fix bugs, etc. Please have a look at the [open issues](https://github.com/APIJSON/APIJSON/issues) before opening a new one .<br />
 
 Fork the project and send a pull request.<br />
@@ -280,22 +285,22 @@ Fork the project and send a pull request.<br />
 Please also ⭐Star the project!
 <br />
 
-## <h2 id="5">5. Versioning<h2/> 
-	
+## <h2 id="5">5. Versioning<h2/>
+
 See the latest version [here.](https://github.com/TommyLemon/APIJSON/commits/master)
 
 <br />
 
-## <h2 id="6">6. Auhtor<h2/> 	
-	
+## <h2 id="6">6. Auhtor<h2/>
+
 Check out the author's [github account](https://github.com/TommyLemon)to see more related projects.<br>
 
 If you have any questions or suggestions, you can [create an issue](https://github.com/TommyLemon/APIJSON/issues) or [send me an e-mail](mailto:tommylemon@qq.com).
 
 <br />
 
-## <h2 id="7">7. Donating<h2/> 
-		
+## <h2 id="7">7. Donating<h2/>
+
 If you like this projects and want to donate for maintainance cost, or want to buy me a coffee, you can scan Wechat QR code or QQ QR code below. <br />
 
 <img src="https://raw.githubusercontent.com/TommyLemon/StaticResources/master/pay/WechatPay.JPG"  width="240" ><img src="https://raw.githubusercontent.com/TommyLemon/StaticResources/master/pay/QQPay.JPG"  width="240" >
@@ -325,4 +330,4 @@ If you like this projects and want to donate for maintainance cost, or want to b
   <a href="https://github.com/Airforce-1/SpringServer1.2-APIJSON"><img src="https://avatars3.githubusercontent.com/u/6212428?s=400&v=4"  height="75" width="75" ></a>
 </div>
 <br />
-	
+
